@@ -123,12 +123,36 @@ export function ConcernRangeCard({
 }
 
 export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
+  const sourceTypeLabel: Record<SourceRecord["sourceType"], string> = {
+    regulation: "官方法規",
+    official_opinion: "官方安全意見",
+    original_study: "原始研究",
+    systematic_review: "系統性回顧",
+    professional_database: "專業資料庫",
+    brand_document: "品牌文件",
+    package_label: "包裝標籤",
+    secondary_website: "第三方消費者網站",
+    discovery_source: "發現來源",
+    community_submission: "社群提交",
+  };
+  const relationshipLabel = {
+    primary: "主要來源",
+    supporting: "支持來源",
+    conflicting: "衝突來源",
+    secondary: "次級來源",
+    discovery: "發現來源",
+    cross_check: "交叉核對",
+  }[source.evidenceRelationship ?? ""] ?? "未標示";
+
   return (
     <article className="rounded-lg border border-[var(--line)] bg-white p-4">
       <div className="flex flex-wrap items-center gap-2">
         <EvidenceGradeBadge grade={source.evidenceGrade} />
         <span className="rounded-md bg-[var(--surface-soft)] px-2 py-1 text-xs text-slate-700">
-          {source.sourceType}
+          {sourceTypeLabel[source.sourceType]}
+        </span>
+        <span className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-900">
+          {relationshipLabel}
         </span>
         {source.isDemo ? (
           <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">開發示範</span>
@@ -141,8 +165,20 @@ export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
           <dd>{source.publisher}</dd>
         </div>
         <div>
+          <dt className="font-medium text-slate-700">來源類別</dt>
+          <dd>{sourceTypeLabel[source.sourceType]}</dd>
+        </div>
+        <div>
           <dt className="font-medium text-slate-700">司法管轄區</dt>
           <dd>{source.jurisdiction ?? "未標示"}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-slate-700">發布日期</dt>
+          <dd>{source.publicationDate ?? "未標示"}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-slate-700">版本</dt>
+          <dd>{source.version ?? "未標示"}</dd>
         </div>
         <div>
           <dt className="font-medium text-slate-700">定位</dt>
@@ -151,6 +187,16 @@ export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
         <div>
           <dt className="font-medium text-slate-700">取用日期</dt>
           <dd>{source.accessedAt ?? "未標示"}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-slate-700">證據關係</dt>
+          <dd>{relationshipLabel}</dd>
+        </div>
+        <div>
+          <dt className="font-medium text-slate-700">授權／重用</dt>
+          <dd>
+            {source.licenceStatus} · {source.commercialReuseStatus}
+          </dd>
         </div>
       </dl>
       {source.externalUrl ? (
@@ -198,6 +244,26 @@ export function VerificationStatusBadge({ status }: Readonly<{ status: Verificat
     <span className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
       <CheckCircle2 aria-hidden="true" size={14} />
       {label[status]}
+    </span>
+  );
+}
+
+export function DataFreshnessBadge({ status }: Readonly<{ status: string }>) {
+  const styles: Record<string, string> = {
+    最新已核實: "border-teal-700/30 bg-teal-50 text-teal-900",
+    最近核實: "border-sky-700/30 bg-sky-50 text-sky-900",
+    可能已更新: "border-amber-700/30 bg-amber-50 text-amber-900",
+    舊配方: "border-slate-500/30 bg-slate-100 text-slate-800",
+    核實日期不明: "border-slate-500/30 bg-white text-slate-700",
+  };
+  return (
+    <span
+      className={clsx(
+        "inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-semibold",
+        styles[status] ?? "border-[var(--line)] bg-white text-slate-700",
+      )}
+    >
+      {status}
     </span>
   );
 }

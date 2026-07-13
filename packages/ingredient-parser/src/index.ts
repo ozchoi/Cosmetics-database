@@ -162,6 +162,111 @@ export const createFormulaHash = async (
   return `sha256:${hex}`;
 };
 
+export interface IngredientListDiffItem {
+  raw: string;
+  normalized: string;
+  fromPosition?: number;
+  toPosition?: number;
+}
+
+export interface IngredientListDiff {
+  added: IngredientListDiffItem[];
+  removed: IngredientListDiffItem[];
+  reordered: IngredientListDiffItem[];
+  hasChanges: boolean;
+}
+
+type DiffToken = Pick<ParsedIngredientToken, "raw" | "normalized" | "position" | "isMayContain">;
+
+interface DiffEntry {
+  id: string;
+  item: IngredientListDiffItem;
+}
+
+const diffKey = (token: DiffToken): string =>
+  `${token.isMayContain ? "may" : "main"}:${token.normalized}`;
+
+const toDiffEntries = (tokens: DiffToken[]): DiffEntry[] => {
+  const occurrences = new Map<string, number>();
+  return tokens.map((token) => {
+    const key = diffKey(token);
+    const occurrence = (occurrences.get(key) ?? 0) + 1;
+    occurrences.set(key, occurrence);
+    return {
+      id: `${key}#${occurrence}`,
+      item: {
+        raw: token.raw,
+        normalized: token.normalized,
+        fromPosition: token.position,
+        toPosition: token.position,
+      },
+    };
+  });
+};
+
+export const compareOrderedIngredientLists = (
+  baseline: DiffToken[],
+  candidate: DiffToken[],
+): IngredientListDiff => {
+  const baselineEntries = toDiffEntries(baseline);
+  const candidateEntries = toDiffEntries(candidate);
+  const baselineIds = new Set(baselineEntries.map((entry) => entry.id));
+  const candidateIds = new Set(candidateEntries.map((entry) => entry.id));
+
+  const added = candidateEntries
+    .filter((entry) => !baselineIds.has(entry.id))
+    .map(({ item }) => ({
+      raw: item.raw,
+      normalized: item.normalized,
+      ...(item.toPosition ? { toPosition: item.toPosition } : {}),
+    }));
+
+  const removed = baselineEntries
+    .filter((entry) => !candidateIds.has(entry.id))
+    .map(({ item }) => ({
+      raw: item.raw,
+      normalized: item.normalized,
+      ...(item.fromPosition ? { fromPosition: item.fromPosition } : {}),
+    }));
+
+  const commonIds = new Set(
+    baselineEntries.filter((entry) => candidateIds.has(entry.id)).map((entry) => entry.id),
+  );
+  const baselineCommonOrder = baselineEntries
+    .filter((entry) => commonIds.has(entry.id))
+    .map((entry) => entry.id);
+  const candidateCommonOrder = candidateEntries
+    .filter((entry) => commonIds.has(entry.id))
+    .map((entry) => entry.id);
+  const candidateIndex = new Map(candidateCommonOrder.map((id, index) => [id, index]));
+  const candidateById = new Map(candidateEntries.map((entry) => [entry.id, entry]));
+
+  const reordered = baselineCommonOrder.flatMap((id, baselineIndex) => {
+    const currentIndex = candidateIndex.get(id);
+    const baselineEntry = baselineEntries.find((entry) => entry.id === id);
+    const candidateEntry = candidateById.get(id);
+    if (currentIndex === undefined || !baselineEntry || !candidateEntry) return [];
+    if (currentIndex === baselineIndex) return [];
+    return [
+      {
+        raw: baselineEntry.item.raw,
+        normalized: baselineEntry.item.normalized,
+        ...(baselineEntry.item.fromPosition
+          ? { fromPosition: baselineEntry.item.fromPosition }
+          : {}),
+        ...(candidateEntry.item.toPosition ? { toPosition: candidateEntry.item.toPosition } : {}),
+      },
+    ];
+  });
+
+  return {
+    added,
+    removed,
+    reordered,
+    hasChanges: added.length > 0 || removed.length > 0 || reordered.length > 0,
+  };
+};
+
 export interface MatcherOptions {
   autoConfirmThreshold: number;
   fuzzyCandidateLimit: number;

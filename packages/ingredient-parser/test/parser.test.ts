@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ingredientFixtures } from "@cosmetic-lens/shared";
 import {
+  compareOrderedIngredientLists,
   createFormulaHash,
   createStableFormulaText,
   matchIngredientList,
@@ -45,6 +46,34 @@ describe("ingredient list parser", () => {
 
     expect(createStableFormulaText(left)).toBe(createStableFormulaText(right));
     await expect(createFormulaHash(left)).resolves.toBe(await createFormulaHash(right));
+  });
+});
+
+describe("ingredient list comparison", () => {
+  it("reports added and removed ingredients without treating simple shifts as reorders", () => {
+    const baseline = parseIngredientList("Aqua, Glycerin, Niacinamide");
+    const candidate = parseIngredientList("Aqua, Glycerin, Panthenol");
+
+    const diff = compareOrderedIngredientLists(baseline, candidate);
+
+    expect(diff.added).toMatchObject([{ raw: "Panthenol", toPosition: 3 }]);
+    expect(diff.removed).toMatchObject([{ raw: "Niacinamide", fromPosition: 3 }]);
+    expect(diff.reordered).toEqual([]);
+    expect(diff.hasChanges).toBe(true);
+  });
+
+  it("reports reordered common ingredients separately from additions", () => {
+    const baseline = parseIngredientList("Aqua, Glycerin, Niacinamide, Panthenol");
+    const candidate = parseIngredientList("Aqua, Niacinamide, Glycerin, Panthenol");
+
+    const diff = compareOrderedIngredientLists(baseline, candidate);
+
+    expect(diff.added).toEqual([]);
+    expect(diff.removed).toEqual([]);
+    expect(diff.reordered).toMatchObject([
+      { raw: "Glycerin", fromPosition: 2, toPosition: 3 },
+      { raw: "Niacinamide", fromPosition: 3, toPosition: 2 },
+    ]);
   });
 });
 

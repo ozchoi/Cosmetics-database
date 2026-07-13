@@ -11,6 +11,7 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: "/search", label: "搜尋", icon: Search },
+  { href: "/products", label: "瀏覽產品", icon: Database },
   { href: "/submit", label: "上載產品相片", icon: Camera },
   { href: "/methodology", label: "評估方法", icon: ShieldCheck },
   { href: "/sources", label: "來源", icon: Database },

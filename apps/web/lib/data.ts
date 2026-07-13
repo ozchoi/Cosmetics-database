@@ -7,9 +7,11 @@ import {
   ingredientFixtures,
   productFixtures,
   sourceFixtures,
+  appConfig,
   type ConcernDimension,
   type IngredientRecord,
   type ProductRecord,
+  type ProductVersionRecord,
 } from "@cosmetic-lens/shared";
 import { normalizeName } from "@cosmetic-lens/ingredient-parser";
 import { calculateProductRatings, type RatingDimensionResult } from "@cosmetic-lens/scoring";
@@ -138,3 +140,192 @@ export const productRatingsForDisplay = (): RatingDimensionResult[] => calculate
 export const allDimensionLabels = Object.entries(concernDimensionLabels) as Array<
   [ConcernDimension, string]
 >;
+
+export type DataFreshnessStatus =
+  | "最新已核實"
+  | "最近核實"
+  | "可能已更新"
+  | "舊配方"
+  | "核實日期不明";
+
+export interface ProductBrowseFilters {
+  category?: string;
+  brand?: string;
+  usageType?: string;
+  productForm?: string;
+  bodyArea?: string;
+  market?: string;
+  verificationStatus?: string;
+  freshness?: DataFreshnessStatus;
+  evidenceConfidence?: string;
+  minCompleteness?: number;
+  concernDimension?: ConcernDimension;
+  sort?: string;
+}
+
+export interface ProductBrowseItem {
+  product: ProductRecord;
+  version: ProductVersionRecord;
+  freshness: DataFreshnessStatus;
+  freshnessReason: string;
+  isPossiblyStale: boolean;
+}
+
+const parseDate = (value?: string): Date | undefined => (value ? new Date(`${value}T00:00:00Z`) : undefined);
+
+const yearsBetween = (older: Date, newer: Date): number =>
+  (newer.getTime() - older.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+
+const latestKnownVerificationDate = (version: ProductVersionRecord): Date | undefined => {
+  const dates = [
+    parseDate(version.lastIndependentVerificationAt),
+    parseDate(version.brandConfirmedAt),
+    parseDate(version.labelObservedAt),
+  ].filter((date): date is Date => Boolean(date));
+  return dates.sort((left, right) => right.getTime() - left.getTime())[0];
+};
+
+export const productVersionFreshness = (
+  version: ProductVersionRecord,
+  today = new Date(),
+): { status: DataFreshnessStatus; reason: string; isPossiblyStale: boolean } => {
+  const latestVerification = latestKnownVerificationDate(version);
+  if (!latestVerification) {
+    return {
+      status: "核實日期不明",
+      reason: "缺少標籤觀察、獨立核實或品牌確認日期。",
+      isPossiblyStale: true,
+    };
+  }
+
+  const ageYears = yearsBetween(latestVerification, today);
+  const isOld = ageYears > appConfig.formulationStaleYears;
+
+  if (isOld) {
+    return {
+      status: "舊配方",
+      reason: `最近核實已超過 ${appConfig.formulationStaleYears} 年。`,
+      isPossiblyStale: true,
+    };
+  }
+
+  if ((version.conflictingNewerSubmissionCount ?? 0) > 0) {
+    return {
+      status: "可能已更新",
+      reason: "已有較新的衝突提交，需審核是否改配方。",
+      isPossiblyStale: true,
+    };
+  }
+
+  if (ageYears <= 0.5 && version.verificationStatus === "reviewed") {
+    return {
+      status: "最新已核實",
+      reason: "最近半年內有已審核標籤或品牌核實資料。",
+      isPossiblyStale: false,
+    };
+  }
+
+  return {
+    status: "最近核實",
+    reason: "核實日期仍在可接受期限內，但購買前仍應對照實物包裝。",
+    isPossiblyStale: false,
+  };
+};
+
+export const productBrowseOptions = () => {
+  const versions = productFixtures.flatMap((product) => product.versions.map((version) => ({ product, version })));
+  const unique = (values: string[]) => [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  return {
+    categories: unique(versions.map(({ version }) => version.category)),
+    brands: unique(productFixtures.map((product) => product.brand)),
+    usageTypes: unique(versions.map(({ version }) => version.usageType)),
+    productForms: unique(versions.map(({ version }) => version.productForm)),
+    bodyAreas: unique(versions.flatMap(({ version }) => version.bodyArea)),
+    markets: unique(versions.map(({ version }) => version.marketCode)),
+    verificationStatuses: unique(versions.map(({ version }) => version.verificationStatus)),
+    evidenceGrades: unique(versions.map(({ version }) => version.evidenceConfidence)),
+    dimensions: allDimensionLabels,
+  };
+};
+
+export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem[] => {
+  const selectedSort = filters.sort ?? "recently_verified";
+  let items = productFixtures.flatMap((product) =>
+    product.versions
+      .filter((version) => version.publicationStatus === "published")
+      .map((version) => {
+        const freshness = productVersionFreshness(version);
+        return {
+          product,
+          version,
+          freshness: freshness.status,
+          freshnessReason: freshness.reason,
+          isPossiblyStale: freshness.isPossiblyStale,
+        };
+      }),
+  );
+
+  items = items.filter(({ product, version, freshness }) => {
+    if (filters.category && version.category !== filters.category) return false;
+    if (filters.brand && product.brand !== filters.brand) return false;
+    if (filters.usageType && version.usageType !== filters.usageType) return false;
+    if (filters.productForm && version.productForm !== filters.productForm) return false;
+    if (filters.bodyArea && !version.bodyArea.includes(filters.bodyArea)) return false;
+    if (filters.market && version.marketCode !== filters.market) return false;
+    if (filters.verificationStatus && version.verificationStatus !== filters.verificationStatus) return false;
+    if (filters.freshness && freshness !== filters.freshness) return false;
+    if (filters.evidenceConfidence && version.evidenceConfidence !== filters.evidenceConfidence) return false;
+    if (filters.minCompleteness !== undefined && version.dataCompleteness < filters.minCompleteness) return false;
+    return true;
+  });
+
+  return items.sort((left, right) => {
+    if (selectedSort === "alphabetical") {
+      return left.product.preferredName.localeCompare(right.product.preferredName, "zh-Hant-HK");
+    }
+    if (selectedSort === "most_complete") {
+      return right.version.dataCompleteness - left.version.dataCompleteness;
+    }
+    if (selectedSort === "recently_submitted") {
+      return (parseDate(right.version.submittedAt)?.getTime() ?? 0) - (parseDate(left.version.submittedAt)?.getTime() ?? 0);
+    }
+    if (selectedSort === "dimension_low" || selectedSort === "dimension_high") {
+      const dimension = filters.concernDimension;
+      const leftValue = dimension ? (left.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY) : 0;
+      const rightValue = dimension ? (right.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY) : 0;
+      return selectedSort === "dimension_low" ? leftValue - rightValue : rightValue - leftValue;
+    }
+    return (
+      (latestKnownVerificationDate(right.version)?.getTime() ?? 0) -
+      (latestKnownVerificationDate(left.version)?.getTime() ?? 0)
+    );
+  });
+};
+
+export const sourceTypeLabel = (type: string): string => {
+  const labels: Record<string, string> = {
+    regulation: "官方法規",
+    official_opinion: "官方安全意見",
+    original_study: "原始研究",
+    systematic_review: "系統性回顧",
+    professional_database: "專業資料庫",
+    brand_document: "品牌文件",
+    package_label: "包裝標籤",
+    secondary_website: "第三方消費者網站",
+    discovery_source: "發現來源",
+    community_submission: "社群提交",
+  };
+  return labels[type] ?? type;
+};
+
+export const evidenceRelationshipLabel = (relationship?: string): string => {
+  const labels: Record<string, string> = {
+    primary: "主要來源",
+    supporting: "支持來源",
+    conflicting: "衝突來源",
+    secondary: "次級來源",
+    discovery: "發現來源",
+    cross_check: "交叉核對",
+  };
+  return relationship ? (labels[relationship] ?? relationship) : "未標示";
+};

@@ -2,6 +2,7 @@ export const appConfig = {
   productName: process.env["APP_NAME"] ?? "成分透視",
   productEnglishName: process.env["APP_ENGLISH_NAME"] ?? "Cosmetic Ingredient Lens",
   locale: "zh-Hant-HK",
+  formulationStaleYears: Number(process.env["FORMULATION_STALE_YEARS"] ?? 3),
 } as const;
 
 export type EvidenceGrade = "A" | "B" | "C" | "D" | "U";
@@ -112,6 +113,7 @@ export interface SourceRecord {
   commercialReuseStatus: "allowed" | "unknown" | "restricted" | "not_applicable";
   reviewStatus: "draft" | "reviewed" | "superseded";
   evidenceGrade: EvidenceGrade;
+  evidenceRelationship?: "primary" | "supporting" | "conflicting" | "secondary" | "discovery" | "cross_check";
   isDemo?: boolean;
 }
 
@@ -134,9 +136,17 @@ export interface ProductVersionRecord {
   bodyArea: string[];
   targetUserGroup: string;
   labelObservedAt: string;
+  lastIndependentVerificationAt?: string;
+  brandConfirmedAt?: string;
+  conflictingNewerSubmissionCount?: number;
+  marketSpecificEvidenceCount?: number;
   formulaHash: string;
   verificationStatus: VerificationStatus;
   publicationStatus: "draft" | "published";
+  submittedAt?: string;
+  evidenceConfidence: EvidenceGrade;
+  dataCompleteness: number;
+  concernDimensionValues: Partial<Record<ConcernDimension, number>>;
   ingredients: ProductIngredientRecord[];
   sourceIds: string[];
 }
@@ -524,6 +534,7 @@ export const sourceFixtures: SourceRecord[] = [
     commercialReuseStatus: "not_applicable",
     reviewStatus: "reviewed",
     evidenceGrade: "U",
+    evidenceRelationship: "primary",
     isDemo: true,
   },
   {
@@ -539,6 +550,7 @@ export const sourceFixtures: SourceRecord[] = [
     commercialReuseStatus: "not_applicable",
     reviewStatus: "reviewed",
     evidenceGrade: "U",
+    evidenceRelationship: "primary",
     isDemo: true,
   },
   {
@@ -554,6 +566,40 @@ export const sourceFixtures: SourceRecord[] = [
     commercialReuseStatus: "unknown",
     reviewStatus: "draft",
     evidenceGrade: "U",
+    evidenceRelationship: "discovery",
+  },
+  {
+    id: "src-discovery-ewg-skin-deep",
+    publisher: "Environmental Working Group",
+    title: "EWG Skin Deep cosmetics database benchmark record",
+    sourceType: "secondary_website",
+    jurisdiction: "US",
+    version: "Public website accessed for IA benchmark",
+    externalUrl: "https://www.ewg.org/skindeep/",
+    exactLocator: "Public category/search and methodology pages",
+    accessedAt: "2026-07-13",
+    languageCode: "en",
+    licenceStatus: "restricted",
+    commercialReuseStatus: "restricted",
+    reviewStatus: "draft",
+    evidenceGrade: "U",
+    evidenceRelationship: "discovery",
+  },
+  {
+    id: "src-discovery-cosdna",
+    publisher: "CosDNA",
+    title: "CosDNA cosmetics ingredient database benchmark record",
+    sourceType: "secondary_website",
+    version: "Public website accessed for IA benchmark",
+    externalUrl: "https://www.cosdna.com/",
+    exactLocator: "Public product and ingredient search pages",
+    accessedAt: "2026-07-13",
+    languageCode: "en",
+    licenceStatus: "unknown",
+    commercialReuseStatus: "unknown",
+    reviewStatus: "draft",
+    evidenceGrade: "U",
+    evidenceRelationship: "cross_check",
   },
 ];
 
@@ -577,9 +623,24 @@ export const productFixtures: ProductRecord[] = [
         bodyArea: ["面部"],
         targetUserGroup: "成人",
         labelObservedAt: "2026-03-18",
+        lastIndependentVerificationAt: "2026-04-02",
+        brandConfirmedAt: "2026-03-25",
+        conflictingNewerSubmissionCount: 1,
+        marketSpecificEvidenceCount: 2,
         formulaHash: "sha256:7de92dc5bc71b2d0a20e9f86d0136d1fddf816c67f6f5b04cfd7e7307d8b3f9a",
         verificationStatus: "reviewed",
         publicationStatus: "published",
+        submittedAt: "2026-03-19",
+        evidenceConfidence: "U",
+        dataCompleteness: 0.42,
+        concernDimensionValues: {
+          skin_eye: 1.2,
+          sensitisation: 1.6,
+          systemic_health: 0.8,
+          inhalation: 0.2,
+          environment: 0.7,
+          regulatory_market: 0.4,
+        },
         sourceIds: ["src-demo-label-hk-001"],
         ingredients: [
           {
@@ -644,9 +705,23 @@ export const productFixtures: ProductRecord[] = [
         bodyArea: ["面部"],
         targetUserGroup: "成人",
         labelObservedAt: "2026-06-28",
+        lastIndependentVerificationAt: "2026-07-05",
+        conflictingNewerSubmissionCount: 0,
+        marketSpecificEvidenceCount: 1,
         formulaHash: "sha256:8a4e41ad72c70e7f1c8c2d947a64084aaf0b91755ac46d85a907d7c289a3fc42",
         verificationStatus: "pending_review",
         publicationStatus: "draft",
+        submittedAt: "2026-06-29",
+        evidenceConfidence: "U",
+        dataCompleteness: 0.3,
+        concernDimensionValues: {
+          skin_eye: 1.1,
+          sensitisation: 1.7,
+          systemic_health: 0.8,
+          inhalation: 0.2,
+          environment: 0.9,
+          regulatory_market: 0.4,
+        },
         sourceIds: ["src-demo-label-hk-001"],
         ingredients: [
           {
@@ -707,6 +782,73 @@ export const productFixtures: ProductRecord[] = [
           },
         ],
       },
+      {
+        id: "pv-mist-spring-2021-hk",
+        versionLabel: "香港版 2021-09（歷史配方）",
+        marketCode: "HK",
+        barcode: "4890000000012",
+        category: "面部精華",
+        productForm: "liquid",
+        usageType: "leave_on",
+        bodyArea: ["面部"],
+        targetUserGroup: "成人",
+        labelObservedAt: "2021-09-14",
+        lastIndependentVerificationAt: "2021-10-02",
+        conflictingNewerSubmissionCount: 2,
+        marketSpecificEvidenceCount: 1,
+        formulaHash: "sha256:14a734e6ef62ec7d92a6e632fda4d4ed6acbe1dbfa0ed41dd9d4a23efa245505",
+        verificationStatus: "reviewed",
+        publicationStatus: "published",
+        submittedAt: "2021-09-15",
+        evidenceConfidence: "U",
+        dataCompleteness: 0.22,
+        concernDimensionValues: {
+          skin_eye: 1.4,
+          sensitisation: 2.2,
+          systemic_health: 1.0,
+          inhalation: 0.2,
+          environment: 0.8,
+          regulatory_market: 0.5,
+        },
+        sourceIds: ["src-demo-label-hk-001"],
+        ingredients: [
+          {
+            position: 1,
+            rawLabelToken: "Aqua",
+            ingredientSlug: "aqua",
+            matchStatus: "confirmed",
+            matchConfidence: 1,
+          },
+          {
+            position: 2,
+            rawLabelToken: "Glycerin",
+            ingredientSlug: "glycerin",
+            matchStatus: "confirmed",
+            matchConfidence: 1,
+          },
+          {
+            position: 3,
+            rawLabelToken: "Butylene Glycol",
+            ingredientSlug: "butylene-glycol",
+            matchStatus: "confirmed",
+            matchConfidence: 1,
+          },
+          {
+            position: 4,
+            rawLabelToken: "Parfum",
+            ingredientSlug: "parfum",
+            matchStatus: "confirmed",
+            matchConfidence: 1,
+          },
+          {
+            position: 5,
+            rawLabelToken: "Phenoxyethanol",
+            ingredientSlug: "phenoxyethanol",
+            matchStatus: "confirmed",
+            matchConfidence: 1,
+          },
+        ],
+      },
     ],
   },
   {
@@ -727,9 +869,23 @@ export const productFixtures: ProductRecord[] = [
         bodyArea: ["面部"],
         targetUserGroup: "成人",
         labelObservedAt: "2026-04-04",
+        lastIndependentVerificationAt: "2026-04-20",
+        conflictingNewerSubmissionCount: 0,
+        marketSpecificEvidenceCount: 1,
         formulaHash: "sha256:6a2c851f3e9ccbd5b3dc4f935ba7d09956f96f90e5fb863da55b95c081be67c7",
         verificationStatus: "reviewed",
         publicationStatus: "published",
+        submittedAt: "2026-04-05",
+        evidenceConfidence: "U",
+        dataCompleteness: 0.36,
+        concernDimensionValues: {
+          skin_eye: 1.0,
+          sensitisation: 1.5,
+          systemic_health: 0.6,
+          inhalation: 0.2,
+          environment: 0.5,
+          regulatory_market: 0.3,
+        },
         sourceIds: ["src-demo-label-hk-002"],
         ingredients: [
           {
@@ -790,9 +946,23 @@ export const productFixtures: ProductRecord[] = [
         bodyArea: ["面部", "頸部"],
         targetUserGroup: "成人",
         labelObservedAt: "2026-05-12",
+        lastIndependentVerificationAt: "2026-05-25",
+        conflictingNewerSubmissionCount: 0,
+        marketSpecificEvidenceCount: 1,
         formulaHash: "sha256:4a06d19d2f3ae6155775d0c3b3ee3a61e3139d42aa4f65daff51831acfa87891",
         verificationStatus: "reviewed",
         publicationStatus: "published",
+        submittedAt: "2026-05-13",
+        evidenceConfidence: "U",
+        dataCompleteness: 0.34,
+        concernDimensionValues: {
+          skin_eye: 1.5,
+          sensitisation: 1.1,
+          systemic_health: 0.7,
+          inhalation: 1.9,
+          environment: 1.0,
+          regulatory_market: 0.8,
+        },
         sourceIds: ["src-demo-label-hk-001"],
         ingredients: [
           {
