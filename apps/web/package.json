@@ -1,0 +1,41 @@
+{
+  "name": "@cosmetic-lens/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@cosmetic-lens/ingredient-parser": "workspace:*",
+    "@cosmetic-lens/ocr": "workspace:*",
+    "@cosmetic-lens/scoring": "workspace:*",
+    "@cosmetic-lens/shared": "workspace:*",
+    "@cosmetic-lens/storage": "workspace:*",
+    "@tailwindcss/postcss": "4.3.2",
+    "clsx": "2.1.1",
+    "lucide-react": "1.24.0",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "react-hook-form": "7.81.0",
+    "sharp": "0.35.3",
+    "tesseract.js": "7.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "26.1.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint-config-next": "16.2.10",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

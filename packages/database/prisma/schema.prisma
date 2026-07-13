@@ -1,0 +1,716 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pgcrypto, pg_trgm]
+}
+
+enum UserRole {
+  user
+  contributor
+  reviewer
+  admin
+}
+
+enum UsageType {
+  leave_on
+  rinse_off
+  mixed
+  unknown
+}
+
+enum ProductForm {
+  cream
+  liquid
+  gel
+  powder
+  spray
+  aerosol
+  stick
+  unknown
+}
+
+enum VerificationStatus {
+  pending_review
+  reviewed
+  needs_correction
+  rejected
+}
+
+enum PublicationStatus {
+  draft
+  published
+  archived
+}
+
+enum SubmissionStatus {
+  pending_review
+  in_review
+  approved
+  rejected
+}
+
+enum ContributionMode {
+  instant_only
+  text_only
+  processed_image_and_text
+}
+
+enum ImageType {
+  product_front
+  product_back
+  ingredient_label
+  barcode
+  other
+}
+
+enum ModerationStatus {
+  pending
+  approved
+  rejected
+}
+
+enum OcrStatus {
+  queued
+  processing
+  completed
+  failed
+}
+
+enum IngredientType {
+  defined_chemical
+  mixture
+  uvcb
+  botanical
+  extract
+  polymer
+  fragrance_mixture
+  colourant
+  mineral
+  unknown
+}
+
+enum NameType {
+  preferred
+  inci
+  common
+  scientific
+  botanical
+  label_alias
+  historical
+  misspelling
+}
+
+enum ReviewStatus {
+  draft
+  reviewed
+  active
+  superseded
+  disputed
+  rejected
+}
+
+enum MatchMethod {
+  exact_canonical_inci
+  exact_reviewed_alias
+  exact_identifier
+  normalised_alias
+  fuzzy_candidate
+  manual_resolution
+}
+
+enum MatchStatus {
+  confirmed
+  uncertain
+  unresolved
+}
+
+enum SourceType {
+  regulation
+  official_opinion
+  original_study
+  systematic_review
+  professional_database
+  brand_document
+  package_label
+  secondary_website
+  discovery_source
+  community_submission
+}
+
+enum EvidenceGrade {
+  A
+  B
+  C
+  D
+  U
+}
+
+enum ClaimStatus {
+  draft
+  reviewed
+  active
+  superseded
+  disputed
+}
+
+enum ClaimSourceRelationship {
+  primary
+  supporting
+  conflicting
+  secondary
+  discovery
+}
+
+enum RatingStatus {
+  calculated
+  insufficient_data
+  not_applicable
+}
+
+enum CorrectionStatus {
+  pending
+  accepted
+  rejected
+}
+
+model User {
+  id                String              @id @default(uuid()) @db.Uuid
+  email             String              @unique
+  displayName       String              @map("display_name")
+  role              UserRole            @default(user)
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  sessions          Session[]
+  submissions       Submission[]
+  reviewed          Submission[]        @relation("SubmissionReviewer")
+  evidenceClaims    EvidenceClaim[]     @relation("EvidenceClaimReviewer")
+  auditLogs         AuditLog[]
+  correctionRequests CorrectionRequest[]
+  reviewedCorrections CorrectionRequest[] @relation("CorrectionReviewer")
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  sessionToken String   @unique @map("session_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Brand {
+  id            String       @id @default(uuid()) @db.Uuid
+  preferredName String       @map("preferred_name")
+  slug          String       @unique
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  aliases       BrandAlias[]
+  products      Product[]
+
+  @@map("brands")
+}
+
+model BrandAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  brandId         String   @map("brand_id") @db.Uuid
+  alias           String
+  normalisedAlias String   @map("normalised_alias")
+  locale          String
+  brand           Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([normalisedAlias])
+  @@map("brand_aliases")
+}
+
+model Product {
+  id                 String           @id @default(uuid()) @db.Uuid
+  brandId            String           @map("brand_id") @db.Uuid
+  preferredName      String           @map("preferred_name")
+  slug               String           @unique
+  descriptionZhHant  String?          @map("description_zh_hant")
+  archivedAt         DateTime?        @map("archived_at")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  brand              Brand            @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  versions           ProductVersion[]
+
+  @@index([brandId])
+  @@map("products")
+}
+
+model Category {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  nameZhHant  String           @map("name_zh_hant")
+  products    ProductVersion[]
+
+  @@map("categories")
+}
+
+model ProductVersion {
+  id                  String                      @id @default(uuid()) @db.Uuid
+  productId           String                      @map("product_id") @db.Uuid
+  marketCode          String                      @map("market_code")
+  barcode             String?
+  categoryId          String?                     @map("category_id") @db.Uuid
+  productForm         ProductForm                 @default(unknown) @map("product_form")
+  usageType           UsageType                   @default(unknown) @map("usage_type")
+  bodyArea            String[]                    @map("body_area")
+  targetUserGroup     String?                     @map("target_user_group")
+  labelObservedAt     DateTime?                   @map("label_observed_at")
+  validFrom           DateTime?                   @map("valid_from")
+  validTo             DateTime?                   @map("valid_to")
+  formulaHash         String                      @map("formula_hash")
+  verificationStatus  VerificationStatus          @default(pending_review) @map("verification_status")
+  publicationStatus   PublicationStatus           @default(draft) @map("publication_status")
+  createdAt           DateTime                    @default(now()) @map("created_at")
+  updatedAt           DateTime                    @updatedAt @map("updated_at")
+  product             Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
+  category            Category?                   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  images              ProductImage[]
+  observations        IngredientListObservation[]
+  ingredients         ProductIngredient[]
+  ratingRuns          RatingRun[]
+
+  @@index([productId])
+  @@index([barcode])
+  @@index([formulaHash])
+  @@unique([productId, marketCode, formulaHash])
+  @@map("product_versions")
+}
+
+model Submission {
+  id               String                      @id @default(uuid()) @db.Uuid
+  userId           String?                     @map("user_id") @db.Uuid
+  status           SubmissionStatus            @default(pending_review)
+  contributionMode ContributionMode            @map("contribution_mode")
+  notes            String?
+  submittedAt      DateTime                    @default(now()) @map("submitted_at")
+  reviewedAt       DateTime?                   @map("reviewed_at")
+  reviewedBy       String?                     @map("reviewed_by") @db.Uuid
+  rejectionReason  String?                     @map("rejection_reason")
+  createdAt        DateTime                    @default(now()) @map("created_at")
+  updatedAt        DateTime                    @updatedAt @map("updated_at")
+  user             User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviewer         User?                       @relation("SubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  images           ProductImage[]
+  ocrJobs          OcrJob[]
+  observations     IngredientListObservation[]
+
+  @@index([status])
+  @@map("submissions")
+}
+
+model ProductImage {
+  id               String           @id @default(uuid()) @db.Uuid
+  submissionId     String           @map("submission_id") @db.Uuid
+  productVersionId String?          @map("product_version_id") @db.Uuid
+  imageType        ImageType        @map("image_type")
+  storageProvider  String           @map("storage_provider")
+  storageKey       String           @map("storage_key")
+  originalFilename String?          @map("original_filename")
+  mimeType         String           @map("mime_type")
+  byteSize         Int              @map("byte_size")
+  width            Int?
+  height           Int?
+  sha256           String
+  exifRemoved      Boolean          @default(false) @map("exif_removed")
+  consentToStore   Boolean          @default(false) @map("consent_to_store")
+  moderationStatus ModerationStatus @default(pending) @map("moderation_status")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  submission       Submission       @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  productVersion   ProductVersion?  @relation(fields: [productVersionId], references: [id], onDelete: SetNull)
+  ocrJobs          OcrJob[]
+
+  @@index([sha256])
+  @@map("product_images")
+}
+
+model OcrJob {
+  id                     String        @id @default(uuid()) @db.Uuid
+  submissionId           String        @map("submission_id") @db.Uuid
+  productImageId         String?       @map("product_image_id") @db.Uuid
+  provider               String
+  providerVersion        String        @map("provider_version")
+  status                 OcrStatus     @default(queued)
+  languageCodes          String[]      @map("language_codes")
+  rawText                String?       @map("raw_text")
+  averageConfidence      Decimal?      @map("average_confidence") @db.Decimal(5, 4)
+  processingMetadataJson Json?         @map("processing_metadata_json")
+  errorMessage           String?       @map("error_message")
+  startedAt              DateTime?     @map("started_at")
+  completedAt            DateTime?     @map("completed_at")
+  createdAt              DateTime      @default(now()) @map("created_at")
+  submission             Submission    @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  productImage           ProductImage? @relation(fields: [productImageId], references: [id], onDelete: SetNull)
+  segments               OcrSegment[]
+
+  @@index([submissionId])
+  @@map("ocr_jobs")
+}
+
+model OcrSegment {
+  id             String   @id @default(uuid()) @db.Uuid
+  ocrJobId       String   @map("ocr_job_id") @db.Uuid
+  text           String
+  confidence     Decimal? @db.Decimal(5, 4)
+  boundingBoxJson Json?   @map("bounding_box_json")
+  sequenceNumber Int      @map("sequence_number")
+  ocrJob         OcrJob   @relation(fields: [ocrJobId], references: [id], onDelete: Cascade)
+
+  @@unique([ocrJobId, sequenceNumber])
+  @@map("ocr_segments")
+}
+
+model IngredientListObservation {
+  id                    String              @id @default(uuid()) @db.Uuid
+  submissionId          String?             @map("submission_id") @db.Uuid
+  productVersionId      String?             @map("product_version_id") @db.Uuid
+  rawOcrText            String?             @map("raw_ocr_text")
+  correctedText         String              @map("corrected_text")
+  parserVersion         String              @map("parser_version")
+  normalisedOrderedText String              @map("normalised_ordered_text")
+  formulaHash           String              @map("formula_hash")
+  confirmedByUser       Boolean             @default(false) @map("confirmed_by_user")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  updatedAt             DateTime            @updatedAt @map("updated_at")
+  submission            Submission?         @relation(fields: [submissionId], references: [id], onDelete: SetNull)
+  productVersion        ProductVersion?      @relation(fields: [productVersionId], references: [id], onDelete: SetNull)
+  productIngredients    ProductIngredient[]
+
+  @@index([formulaHash])
+  @@map("ingredient_list_observations")
+}
+
+model Ingredient {
+  id                         String                       @id @default(uuid()) @db.Uuid
+  canonicalInciName          String                       @map("canonical_inci_name")
+  preferredEnglishName       String                       @map("preferred_english_name")
+  preferredZhHantHkName      String                       @map("preferred_zh_hant_hk_name")
+  slug                       String                       @unique
+  ingredientType             IngredientType               @map("ingredient_type")
+  descriptionZhHant          String?                      @map("description_zh_hant")
+  reviewStatus               ReviewStatus                 @default(draft) @map("review_status")
+  createdAt                  DateTime                     @default(now()) @map("created_at")
+  updatedAt                  DateTime                     @updatedAt @map("updated_at")
+  names                      IngredientName[]
+  functionMappings           IngredientFunctionMapping[]
+  substanceMappings          IngredientSubstanceMapping[]
+  productIngredients         ProductIngredient[]
+  evidenceClaims             EvidenceClaim[]
+  regulatoryRules            RegulatoryRule[]
+
+  @@index([canonicalInciName])
+  @@map("ingredients")
+}
+
+model IngredientName {
+  id             String       @id @default(uuid()) @db.Uuid
+  ingredientId   String       @map("ingredient_id") @db.Uuid
+  name           String
+  normalisedName String       @map("normalised_name")
+  languageCode   String       @map("language_code")
+  regionCode     String?      @map("region_code")
+  nameType       NameType     @map("name_type")
+  sourceId       String?      @map("source_id") @db.Uuid
+  reviewStatus   ReviewStatus @default(draft) @map("review_status")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  ingredient     Ingredient   @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  source         Source?      @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([normalisedName])
+  @@map("ingredient_names")
+}
+
+model IngredientFunction {
+  id                String                      @id @default(uuid()) @db.Uuid
+  code              String                      @unique
+  nameEn            String                      @map("name_en")
+  nameZhHant        String                      @map("name_zh_hant")
+  descriptionZhHant String?                     @map("description_zh_hant")
+  mappings          IngredientFunctionMapping[]
+
+  @@map("ingredient_functions")
+}
+
+model IngredientFunctionMapping {
+  ingredientId String             @map("ingredient_id") @db.Uuid
+  functionId   String             @map("function_id") @db.Uuid
+  sourceId     String?            @map("source_id") @db.Uuid
+  ingredient   Ingredient         @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  function     IngredientFunction @relation(fields: [functionId], references: [id], onDelete: Restrict)
+  source       Source?            @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@id([ingredientId, functionId])
+  @@map("ingredient_function_mappings")
+}
+
+model ChemicalSubstance {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  preferredName       String                       @map("preferred_name")
+  casNumber           String?                      @map("cas_number")
+  ecNumber            String?                      @map("ec_number")
+  pubchemCid          String?                      @map("pubchem_cid")
+  dtxsid              String?
+  inchikey            String?
+  substanceType       String                       @map("substance_type")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
+  ingredientMappings  IngredientSubstanceMapping[]
+  evidenceClaims      EvidenceClaim[]
+  regulatoryRules     RegulatoryRule[]
+
+  @@index([casNumber])
+  @@map("chemical_substances")
+}
+
+model IngredientSubstanceMapping {
+  id                 String            @id @default(uuid()) @db.Uuid
+  ingredientId       String            @map("ingredient_id") @db.Uuid
+  substanceId        String            @map("substance_id") @db.Uuid
+  relationshipType   String            @map("relationship_type")
+  mappingConfidence  Decimal           @map("mapping_confidence") @db.Decimal(5, 4)
+  sourceId           String?           @map("source_id") @db.Uuid
+  reviewStatus       ReviewStatus      @default(draft) @map("review_status")
+  ingredient         Ingredient        @relation(fields: [ingredientId], references: [id], onDelete: Restrict)
+  substance          ChemicalSubstance @relation(fields: [substanceId], references: [id], onDelete: Restrict)
+  source             Source?           @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([ingredientId])
+  @@index([substanceId])
+  @@map("ingredient_substance_mappings")
+}
+
+model ProductIngredient {
+  id                          String                    @id @default(uuid()) @db.Uuid
+  productVersionId            String                    @map("product_version_id") @db.Uuid
+  ingredientListObservationId String?                   @map("ingredient_list_observation_id") @db.Uuid
+  position                    Int
+  rawLabelToken               String                    @map("raw_label_token")
+  normalisedToken             String                    @map("normalised_token")
+  ingredientId                String?                   @map("ingredient_id") @db.Uuid
+  matchMethod                 MatchMethod?              @map("match_method")
+  matchConfidence             Decimal                   @map("match_confidence") @db.Decimal(5, 4)
+  matchStatus                 MatchStatus               @map("match_status")
+  isMayContain                Boolean                   @default(false) @map("is_may_contain")
+  concentrationMin            Decimal?                  @map("concentration_min") @db.Decimal(8, 4)
+  concentrationMax            Decimal?                  @map("concentration_max") @db.Decimal(8, 4)
+  concentrationBasis          String?                   @map("concentration_basis")
+  concentrationIsInferred     Boolean                   @default(false) @map("concentration_is_inferred")
+  notes                       String?
+  productVersion              ProductVersion            @relation(fields: [productVersionId], references: [id], onDelete: Restrict)
+  observation                 IngredientListObservation? @relation(fields: [ingredientListObservationId], references: [id], onDelete: SetNull)
+  ingredient                  Ingredient?               @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  ratingContributions         RatingContribution[]
+
+  @@unique([productVersionId, position])
+  @@index([normalisedToken])
+  @@map("product_ingredients")
+}
+
+model Source {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  publisher              String
+  title                  String
+  sourceType             SourceType             @map("source_type")
+  jurisdiction           String?
+  publicationDate        DateTime?              @map("publication_date")
+  version                String?
+  externalUrl            String?                @map("external_url")
+  exactLocator           String?                @map("exact_locator")
+  accessedAt             DateTime?              @map("accessed_at")
+  languageCode           String?                @map("language_code")
+  licenceStatus          String                 @map("licence_status")
+  commercialReuseStatus  String                 @map("commercial_reuse_status")
+  attributionText        String?                @map("attribution_text")
+  archivedSnapshotSha256 String?                @map("archived_snapshot_sha256")
+  reviewStatus           ReviewStatus           @default(draft) @map("review_status")
+  isDemo                 Boolean                @default(false) @map("is_demo")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+  ingredientNames        IngredientName[]
+  functionMappings       IngredientFunctionMapping[]
+  substanceMappings      IngredientSubstanceMapping[]
+  claimSources           ClaimSource[]
+  regulatoryRules        RegulatoryRule[]
+
+  @@index([publisher])
+  @@index([sourceType])
+  @@map("sources")
+}
+
+model EvidenceClaim {
+  id                         String                 @id @default(uuid()) @db.Uuid
+  ingredientId               String?                @map("ingredient_id") @db.Uuid
+  substanceId                String?                @map("substance_id") @db.Uuid
+  claimType                  String                 @map("claim_type")
+  endpoint                   String
+  effectDirection            String                 @map("effect_direction")
+  summaryZhHant              String                 @map("summary_zh_hant")
+  structuredValue            Json?                  @map("structured_value")
+  unit                       String?
+  route                      String?
+  testSystem                 String?                @map("test_system")
+  population                 String?
+  concentrationMin           Decimal?               @map("concentration_min") @db.Decimal(8, 4)
+  concentrationMax           Decimal?               @map("concentration_max") @db.Decimal(8, 4)
+  applicableProductTypesJson Json?                  @map("applicable_product_types_json")
+  applicableConditionsJson   Json?                  @map("applicable_conditions_json")
+  evidenceGrade              EvidenceGrade          @map("evidence_grade")
+  status                     ClaimStatus            @default(draft)
+  reviewedBy                 String?                @map("reviewed_by") @db.Uuid
+  reviewedAt                 DateTime?              @map("reviewed_at")
+  isDemo                     Boolean                @default(false) @map("is_demo")
+  createdAt                  DateTime               @default(now()) @map("created_at")
+  updatedAt                  DateTime               @updatedAt @map("updated_at")
+  ingredient                 Ingredient?            @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  substance                  ChemicalSubstance?     @relation(fields: [substanceId], references: [id], onDelete: SetNull)
+  reviewer                   User?                  @relation("EvidenceClaimReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  claimSources               ClaimSource[]
+  ratingContributions        RatingContribution[]
+
+  @@index([ingredientId])
+  @@index([substanceId])
+  @@map("evidence_claims")
+}
+
+model ClaimSource {
+  evidenceClaimId String                  @map("evidence_claim_id") @db.Uuid
+  sourceId        String                  @map("source_id") @db.Uuid
+  relationshipType ClaimSourceRelationship @map("relationship_type")
+  evidenceClaim   EvidenceClaim           @relation(fields: [evidenceClaimId], references: [id], onDelete: Cascade)
+  source          Source                  @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@id([evidenceClaimId, sourceId, relationshipType])
+  @@map("claim_sources")
+}
+
+model RegulatoryRule {
+  id                  String             @id @default(uuid()) @db.Uuid
+  ingredientId        String?            @map("ingredient_id") @db.Uuid
+  substanceId         String?            @map("substance_id") @db.Uuid
+  jurisdiction        String
+  status              String
+  productScope        String?            @map("product_scope")
+  usageType           UsageType?         @map("usage_type")
+  concentrationMin    Decimal?           @map("concentration_min") @db.Decimal(8, 4)
+  concentrationMax    Decimal?           @map("concentration_max") @db.Decimal(8, 4)
+  requiredWarningText String?            @map("required_warning_text")
+  effectiveFrom       DateTime?          @map("effective_from")
+  effectiveTo         DateTime?          @map("effective_to")
+  summaryZhHant       String             @map("summary_zh_hant")
+  sourceId            String             @map("source_id") @db.Uuid
+  reviewStatus        ReviewStatus       @default(draft) @map("review_status")
+  ingredient          Ingredient?        @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+  substance           ChemicalSubstance? @relation(fields: [substanceId], references: [id], onDelete: SetNull)
+  source              Source             @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@index([jurisdiction])
+  @@map("regulatory_rules")
+}
+
+model MethodologyVersion {
+  id                  String          @id @default(uuid()) @db.Uuid
+  name                String
+  semanticVersion     String          @map("semantic_version")
+  descriptionZhHant   String          @map("description_zh_hant")
+  configurationJson   Json            @map("configuration_json")
+  effectiveFrom       DateTime        @map("effective_from")
+  effectiveTo         DateTime?       @map("effective_to")
+  publicationStatus   PublicationStatus @default(draft) @map("publication_status")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  ratingRuns          RatingRun[]
+
+  @@unique([name, semanticVersion])
+  @@map("methodology_versions")
+}
+
+model RatingRun {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  productVersionId     String                  @map("product_version_id") @db.Uuid
+  methodologyVersionId String                  @map("methodology_version_id") @db.Uuid
+  sourceSnapshotHash   String                  @map("source_snapshot_hash")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  productVersion       ProductVersion          @relation(fields: [productVersionId], references: [id], onDelete: Restrict)
+  methodologyVersion   MethodologyVersion      @relation(fields: [methodologyVersionId], references: [id], onDelete: Restrict)
+  dimensionResults     RatingDimensionResult[]
+
+  @@index([productVersionId])
+  @@map("rating_runs")
+}
+
+model RatingDimensionResult {
+  id                String                 @id @default(uuid()) @db.Uuid
+  ratingRunId       String                 @map("rating_run_id") @db.Uuid
+  dimension         String
+  scoreMin          Decimal?               @map("score_min") @db.Decimal(8, 4)
+  scoreMax          Decimal?               @map("score_max") @db.Decimal(8, 4)
+  concernBand       String?                @map("concern_band")
+  confidenceGrade   EvidenceGrade          @map("confidence_grade")
+  dataCompleteness  Decimal                @map("data_completeness") @db.Decimal(5, 4)
+  status            RatingStatus
+  explanationZhHant String                 @map("explanation_zh_hant")
+  ratingRun         RatingRun              @relation(fields: [ratingRunId], references: [id], onDelete: Cascade)
+  contributions     RatingContribution[]
+
+  @@unique([ratingRunId, dimension])
+  @@map("rating_dimension_results")
+}
+
+model RatingContribution {
+  id                       String                  @id @default(uuid()) @db.Uuid
+  ratingDimensionResultId  String                  @map("rating_dimension_result_id") @db.Uuid
+  productIngredientId      String                  @map("product_ingredient_id") @db.Uuid
+  evidenceClaimId          String?                 @map("evidence_claim_id") @db.Uuid
+  contributionMin          Decimal?                @map("contribution_min") @db.Decimal(8, 4)
+  contributionMax          Decimal?                @map("contribution_max") @db.Decimal(8, 4)
+  explanationZhHant        String                  @map("explanation_zh_hant")
+  ratingDimensionResult    RatingDimensionResult   @relation(fields: [ratingDimensionResultId], references: [id], onDelete: Cascade)
+  productIngredient        ProductIngredient       @relation(fields: [productIngredientId], references: [id], onDelete: Restrict)
+  evidenceClaim            EvidenceClaim?          @relation(fields: [evidenceClaimId], references: [id], onDelete: SetNull)
+
+  @@index([productIngredientId])
+  @@map("rating_contributions")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  entityType     String   @map("entity_type")
+  entityId       String   @map("entity_id")
+  action         String
+  beforeJson     Json?    @map("before_json")
+  afterJson      Json?    @map("after_json")
+  createdAt      DateTime @default(now()) @map("created_at")
+  actor          User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model CorrectionRequest {
+  id                 String           @id @default(uuid()) @db.Uuid
+  userId             String?          @map("user_id") @db.Uuid
+  entityType         String           @map("entity_type")
+  entityId           String           @map("entity_id")
+  proposedChangeJson Json             @map("proposed_change_json")
+  evidenceNotes      String?          @map("evidence_notes")
+  status             CorrectionStatus @default(pending)
+  reviewedBy         String?          @map("reviewed_by") @db.Uuid
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+  user               User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  reviewer           User?            @relation("CorrectionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@map("correction_requests")
+}
