@@ -5,9 +5,9 @@
 - This repository is empty except for Git metadata, so the MVP is scaffolded from scratch.
 - The default public locale is `zh-Hant-HK`; developer documentation and code identifiers use English.
 - The product names `成分透視` and `Cosmetic Ingredient Lens` are configurable.
-- PostgreSQL is the production data store; fixtures are used only to keep the first local vertical slice usable before a developer starts Docker.
-- Browser-side OCR is the default free provider; deterministic OCR fixtures support tests and demos.
-- Seed scientific data is limited to identity, aliases, functions, and source-ready placeholders. Demo evidence is explicitly marked as development data and must not be presented as production evidence.
+- PostgreSQL is the production data store; normal bootstrap scripts do not create consumer-facing product or evidence data.
+- Browser-side OCR is the default free provider; deterministic OCR fixtures support isolated tests.
+- Production-facing data must come from approved reusable sources, real package-label observations, user submissions retained with consent, reviewer-entered source-backed records, or approved official chemical identity APIs.
 
 ## Architecture Decisions
 
@@ -21,8 +21,8 @@
 ## Build Sequence
 
 1. Create root rules, workspace configuration, environment template, Docker Compose, and CI.
-2. Add domain packages for shared fixtures/types, ingredient parsing/matching, scoring, OCR, and storage.
-3. Add Prisma schema, migration SQL, and development seed script.
+2. Add domain packages for shared types, ingredient parsing/matching, scoring, OCR, storage, and importers.
+3. Add Prisma schema, migration SQL, source-policy bootstrap, and staged import commands.
 4. Implement public pages, search, ingredient/product views, upload/OCR review flow, contribution submission, auth, and admin review surfaces.
 5. Add documentation for architecture, data model, OCR pipeline, scoring, source policy, security, deployment, and roadmap.
 6. Run formatting, lint, typecheck, unit/integration tests, E2E where available, and production build.

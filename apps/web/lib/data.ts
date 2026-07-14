@@ -1,12 +1,12 @@
 import {
   concernDimensionLabels,
-  demoEvidenceFixtures,
   findIngredientBySlug,
   findProductBySlug,
   findSourceById,
-  ingredientFixtures,
-  productFixtures,
-  sourceFixtures,
+  productionEvidenceSummaries,
+  productionIngredientRecords,
+  productionProductRecords,
+  productionSourceRecords,
   appConfig,
   type ConcernDimension,
   type IngredientRecord,
@@ -96,7 +96,7 @@ const rankTerms = (
 };
 
 export const searchIngredients = (query: string): SearchResult<IngredientRecord>[] =>
-  ingredientFixtures
+  productionIngredientRecords
     .map((ingredient) => {
       const rank = rankTerms(query, ingredientSearchTerms(ingredient));
       return rank ? { item: ingredient, ...rank } : undefined;
@@ -109,7 +109,7 @@ export const searchIngredients = (query: string): SearchResult<IngredientRecord>
     );
 
 export const searchProducts = (query: string): SearchResult<ProductRecord>[] =>
-  productFixtures
+  productionProductRecords
     .map((product) => {
       const rank = rankTerms(query, productSearchTerms(product));
       return rank ? { item: product, ...rank } : undefined;
@@ -121,7 +121,7 @@ export const searchProducts = (query: string): SearchResult<ProductRecord>[] =>
     );
 
 export const latestReviewedProducts = (): ProductRecord[] =>
-  productFixtures
+  productionProductRecords
     .filter((product) =>
       product.versions.some((version) => version.verificationStatus === "reviewed"),
     )
@@ -130,10 +130,10 @@ export const latestReviewedProducts = (): ProductRecord[] =>
 export const getIngredient = findIngredientBySlug;
 export const getProduct = findProductBySlug;
 export const getSource = findSourceById;
-export const listSources = () => sourceFixtures;
+export const listSources = () => productionSourceRecords;
 
 export const getIngredientDemoEvidence = (ingredientSlug: string) =>
-  demoEvidenceFixtures.filter((evidence) => evidence.ingredientSlug === ingredientSlug);
+  productionEvidenceSummaries.filter((evidence) => evidence.ingredientSlug === ingredientSlug);
 
 export const productRatingsForDisplay = (): RatingDimensionResult[] => calculateProductRatings([]);
 
@@ -171,6 +171,7 @@ export const verificationStatusDisplay = (value: string): string => {
     reviewed: "已審核",
     needs_correction: "需要修正",
     rejected: "已拒絕",
+    externally_imported_unverified: "外部匯入未核實",
   };
   return labels[value] ?? value;
 };
@@ -264,14 +265,14 @@ export const productVersionFreshness = (
 };
 
 export const productBrowseOptions = () => {
-  const versions = productFixtures.flatMap((product) =>
+  const versions = productionProductRecords.flatMap((product) =>
     product.versions.map((version) => ({ product, version })),
   );
   const unique = (values: string[]) =>
     [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
   return {
     categories: unique(versions.map(({ version }) => version.category)),
-    brands: unique(productFixtures.map((product) => product.brand)),
+    brands: unique(productionProductRecords.map((product) => product.brand)),
     usageTypes: unique(versions.map(({ version }) => version.usageType)),
     productForms: unique(versions.map(({ version }) => version.productForm)),
     bodyAreas: unique(versions.flatMap(({ version }) => version.bodyArea)),
@@ -284,7 +285,7 @@ export const productBrowseOptions = () => {
 
 export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem[] => {
   const selectedSort = filters.sort ?? "recently_verified";
-  let items = productFixtures.flatMap((product) =>
+  let items = productionProductRecords.flatMap((product) =>
     product.versions
       .filter((version) => version.publicationStatus === "published")
       .map((version) => {
@@ -355,9 +356,11 @@ export const sourceTypeLabel = (type: string): string => {
     professional_database: "專業資料庫",
     brand_document: "品牌文件",
     package_label: "包裝標籤",
+    open_product_database: "開放產品資料庫",
     secondary_website: "第三方消費者網站",
     discovery_source: "發現來源",
     community_submission: "社群提交",
+    reference_only_no_import: "只供參考，不匯入",
   };
   return labels[type] ?? type;
 };

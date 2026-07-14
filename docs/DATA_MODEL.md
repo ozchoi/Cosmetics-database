@@ -22,6 +22,11 @@ erDiagram
   ChemicalSubstance ||--o{ EvidenceClaim : claims
   EvidenceClaim ||--o{ ClaimSource : cites
   Source ||--o{ ClaimSource : cited
+  DataSourcePolicy ||--o{ ImportJob : gates
+  ImportJob ||--o{ RawImportRecord : captures
+  RawImportRecord ||--o{ StagedProduct : maps
+  RawImportRecord ||--o{ StagedIngredient : maps
+  RawImportRecord ||--o{ EvidenceCandidate : proposes
   Source ||--o{ RegulatoryRule : supports
   ProductVersion ||--o{ RatingRun : rated
   MethodologyVersion ||--o{ RatingRun : configures
@@ -39,4 +44,6 @@ erDiagram
 - Unmatched label tokens are stored in `ProductIngredient` with `match_status = unresolved`.
 - `IngredientName.normalised_name` is indexed but not globally unique, because ambiguous aliases exist.
 - Deleting sources referenced by active evidence must be restricted.
-- Demo evidence has `is_demo = true` and must not appear as production evidence.
+- Consumer-facing publication is blocked unless the record is tied to source provenance or an approved user observation.
+- External imports land in raw/staging tables first; reviewer approval is required before canonical publication.
+- Evidence claims must cite at least one real source before publication.

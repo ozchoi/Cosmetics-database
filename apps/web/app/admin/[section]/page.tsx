@@ -9,7 +9,12 @@ import {
   secondaryButtonClass,
   buttonClass,
 } from "../../../components/ui";
-import { ingredientFixtures, productFixtures, sourceFixtures } from "@cosmetic-lens/shared";
+import {
+  dataSourcePolicyRecords,
+  productionIngredientRecords,
+  productionProductRecords,
+  productionSourceRecords,
+} from "@cosmetic-lens/shared";
 import { matchIngredientList } from "@cosmetic-lens/ingredient-parser";
 
 const sectionLabels: Record<string, string> = {
@@ -99,7 +104,7 @@ async function PendingSubmissions({ label }: Readonly<{ label: string }>) {
                 <div>
                   <h3 className="text-sm font-semibold text-slate-800">解析結果</h3>
                   <ul className="mt-2 grid gap-2 text-sm">
-                    {matchIngredientList(submission.correctedText, ingredientFixtures).map(
+                    {matchIngredientList(submission.correctedText, productionIngredientRecords).map(
                       (match) => (
                         <li
                           key={`${submission.id}-${match.token.position}`}
@@ -235,7 +240,7 @@ async function OcrReview({ label }: Readonly<{ label: string }>) {
 async function UnresolvedTokens({ label }: Readonly<{ label: string }>) {
   const submissions = await listSubmissions();
   const unresolved = submissions.flatMap((submission) =>
-    matchIngredientList(submission.correctedText, ingredientFixtures)
+    matchIngredientList(submission.correctedText, productionIngredientRecords)
       .filter((match) => match.status !== "confirmed")
       .map((match) => ({ submission, match })),
   );
@@ -277,7 +282,7 @@ function IngredientsAdmin({ label }: Readonly<{ label: string }>) {
       body="管理成分身份、INCI、中文名稱、英文名稱、別名及功能；中文名稱不得作 primary identity。"
     >
       <div className="grid gap-3 md:grid-cols-2">
-        {ingredientFixtures.map((ingredient) => (
+        {productionIngredientRecords.map((ingredient) => (
           <article
             key={ingredient.id}
             className="rounded-lg border border-[var(--line)] bg-white p-4"
@@ -297,7 +302,7 @@ function ProductsAdmin({ label }: Readonly<{ label: string }>) {
       body="產品及版本以 formula hash、market、barcode、觀察日期及審核狀態區分；舊版本不可覆寫。"
     >
       <div className="grid gap-3">
-        {productFixtures.map((product) => (
+        {productionProductRecords.map((product) => (
           <article key={product.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-semibold text-slate-950">{product.preferredName}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">
@@ -314,10 +319,32 @@ function SourcesAdmin({ label }: Readonly<{ label: string }>) {
   return (
     <AdminShell
       label={label}
-      body="來源不可在仍被 active evidence 引用時刪除；未知授權不得批量匯入。"
+      body="來源不可在仍被 active evidence 引用時刪除；未知授權不得批量匯入。公開網站可供瀏覽，並不代表可以大量複製、抓取或重新發布其資料。"
     >
+      <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm font-semibold text-amber-950">
+        公開網站可供瀏覽，並不代表可以大量複製、抓取或重新發布其資料。
+      </div>
+      <div className="mb-6 grid gap-3">
+        {dataSourcePolicyRecords.map((policy) => (
+          <article key={policy.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-950">{policy.sourceName}</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {policy.sourceAccessClass} · {policy.accessMethod} · legal{" "}
+                  {policy.legalReviewStatus}
+                </p>
+              </div>
+              <span className="rounded-md bg-[var(--surface-soft)] px-2 py-1 text-xs font-semibold text-slate-700">
+                {policy.importerEnabled ? "importer enabled" : "reference/import disabled"}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-[var(--muted)]">{policy.reviewNotes}</p>
+          </article>
+        ))}
+      </div>
       <div className="grid gap-3">
-        {sourceFixtures.map((source) => (
+        {productionSourceRecords.map((source) => (
           <article key={source.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-semibold text-slate-950">{source.title}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">

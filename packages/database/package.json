@@ -11,14 +11,18 @@
     "db:generate": "prisma generate --schema prisma/schema.prisma",
     "db:migrate": "prisma migrate deploy --schema prisma/schema.prisma",
     "db:dev": "prisma migrate dev --schema prisma/schema.prisma",
-    "db:seed": "prisma db seed --schema prisma/schema.prisma",
+    "db:bootstrap": "tsx src/bootstrap.ts",
+    "db:import:open-beauty-facts": "tsx src/cli/open-beauty-facts.ts",
+    "db:enrich:pubchem": "tsx src/cli/pubchem.ts",
+    "db:enrich:comptox": "tsx src/cli/comptox.ts",
+    "db:validate:sources": "tsx src/cli/validate-sources.ts",
+    "db:rebuild-search": "tsx src/cli/rebuild-search.ts",
+    "import:status": "tsx src/cli/import-status.ts",
     "db:studio": "prisma studio --schema prisma/schema.prisma"
-  },
-  "prisma": {
-    "seed": "tsx src/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "7.8.0",
+    "@cosmetic-lens/importers": "workspace:*",
     "@cosmetic-lens/shared": "workspace:*"
   },
   "devDependencies": {

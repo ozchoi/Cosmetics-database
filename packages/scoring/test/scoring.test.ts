@@ -7,14 +7,14 @@ import {
 
 const baseInput: RatingInputContribution = {
   productIngredientId: "pi-1",
-  ingredientName: "Demo ingredient",
+  ingredientName: "Synthetic test ingredient",
   dimension: "skin_eye",
   hazardSeverity: { min: 1, max: 2 },
   exposure: { min: 0.5, max: 1 },
   contextModifierKeys: ["leave_on"],
   evidenceGrade: "C",
   dataCompleteness: 0.6,
-  explanationZhHant: "開發示範，不作真實安全結論。",
+  explanationZhHant: "測試環境專用合成記錄，不作真實安全結論。",
 };
 
 describe("mvp-0.1 scoring", () => {

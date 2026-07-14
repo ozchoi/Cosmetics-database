@@ -30,7 +30,7 @@ cp .env.example .env
 pnpm setup
 docker compose up -d
 pnpm db:migrate
-pnpm db:seed
+pnpm db:bootstrap
 pnpm dev
 ```
 
@@ -54,7 +54,14 @@ EWG Skin Deep, CosDNA, Open Beauty Facts, and similar sites are treated only as 
 - `pnpm test`
 - `pnpm test:e2e`
 - `pnpm db:migrate`
-- `pnpm db:seed`
+- `pnpm db:bootstrap`
+- `pnpm import:open-beauty-facts -- --limit 250 --require-ingredients --dry-run`
+- `pnpm import:open-beauty-facts -- --limit 250 --require-ingredients --commit`
+- `pnpm enrich:pubchem -- --reviewed-identities-only --limit 100`
+- `pnpm enrich:comptox -- --stage-only --limit 100`
+- `pnpm import:status`
+- `pnpm import:validate`
+- `pnpm search:rebuild`
 - `pnpm db:studio`
 - `pnpm setup`
 
@@ -81,4 +88,6 @@ Users can analyse without storing an original photo. If they opt into contributi
 
 ## Data Coverage
 
-Seed data is intentionally limited to fictional products and common ingredient identity records. Demo evidence is marked as development data and must not be treated as production evidence.
+The production-facing database is real-data only. Bootstrap scripts do not insert fictional products, brands, evidence claims, regulatory limits, placeholder scores, or demo ratings. Consumer-facing records must come from approved reusable sources, real package-label observations, user submissions retained with consent, reviewer-entered source-backed records, or approved official chemical identity APIs.
+
+Test fixtures use clearly synthetic records inside test files only and are not loaded by normal database setup.

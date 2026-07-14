@@ -17,10 +17,10 @@ CREATE TYPE "UsageType" AS ENUM ('leave_on', 'rinse_off', 'mixed', 'unknown');
 CREATE TYPE "ProductForm" AS ENUM ('cream', 'liquid', 'gel', 'powder', 'spray', 'aerosol', 'stick', 'unknown');
 
 -- CreateEnum
-CREATE TYPE "VerificationStatus" AS ENUM ('pending_review', 'reviewed', 'needs_correction', 'rejected');
+CREATE TYPE "VerificationStatus" AS ENUM ('pending_review', 'reviewed', 'needs_correction', 'rejected', 'externally_imported_unverified');
 
 -- CreateEnum
-CREATE TYPE "PublicationStatus" AS ENUM ('draft', 'published', 'archived');
+CREATE TYPE "PublicationStatus" AS ENUM ('draft', 'published', 'archived', 'review_required');
 
 -- CreateEnum
 CREATE TYPE "SubmissionStatus" AS ENUM ('pending_review', 'in_review', 'approved', 'rejected');
@@ -53,7 +53,34 @@ CREATE TYPE "MatchMethod" AS ENUM ('exact_canonical_inci', 'exact_reviewed_alias
 CREATE TYPE "MatchStatus" AS ENUM ('confirmed', 'uncertain', 'unresolved');
 
 -- CreateEnum
-CREATE TYPE "SourceType" AS ENUM ('regulation', 'official_opinion', 'original_study', 'systematic_review', 'professional_database', 'brand_document', 'package_label', 'secondary_website', 'discovery_source', 'community_submission');
+CREATE TYPE "SourceType" AS ENUM ('regulation', 'official_opinion', 'original_study', 'systematic_review', 'professional_database', 'brand_document', 'package_label', 'open_product_database', 'secondary_website', 'discovery_source', 'community_submission', 'reference_only_no_import');
+
+-- CreateEnum
+CREATE TYPE "SourceAccessClass" AS ENUM ('open_structured_source', 'official_reference_source', 'secondary_or_discovery_source', 'user_contributed_primary_observation');
+
+-- CreateEnum
+CREATE TYPE "SourceAccessMethod" AS ENUM ('API', 'bulk_export', 'manual_entry', 'user_submission', 'reviewer_research', 'prohibited');
+
+-- CreateEnum
+CREATE TYPE "CommercialUseStatus" AS ENUM ('allowed', 'restricted', 'unknown', 'prohibited');
+
+-- CreateEnum
+CREATE TYPE "LegalReviewStatus" AS ENUM ('not_reviewed', 'provisional', 'approved', 'rejected');
+
+-- CreateEnum
+CREATE TYPE "ImportJobStatus" AS ENUM ('queued', 'running', 'completed', 'failed', 'cancelled');
+
+-- CreateEnum
+CREATE TYPE "ImportRecordStatus" AS ENUM ('pending', 'validated', 'staged', 'rejected', 'imported');
+
+-- CreateEnum
+CREATE TYPE "StagingReviewStatus" AS ENUM ('pending_review', 'approved', 'rejected', 'needs_more_source');
+
+-- CreateEnum
+CREATE TYPE "ProposedImportAction" AS ENUM ('create', 'update', 'link_existing', 'reject');
+
+-- CreateEnum
+CREATE TYPE "ExternalEndpointKind" AS ENUM ('measured_result', 'predicted_result', 'in_vitro_assay', 'animal_result', 'human_observation', 'regulatory_classification', 'exposure_estimate', 'environmental_fate_property', 'other');
 
 -- CreateEnum
 CREATE TYPE "EvidenceGrade" AS ENUM ('A', 'B', 'C', 'D', 'U');
@@ -534,6 +561,169 @@ CREATE TABLE "correction_requests" (
     CONSTRAINT "correction_requests_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "data_source_policies" (
+    "id" UUID NOT NULL,
+    "source_id" TEXT NOT NULL,
+    "source_name" TEXT NOT NULL,
+    "source_domain" TEXT NOT NULL,
+    "source_access_class" "SourceAccessClass" NOT NULL,
+    "access_method" "SourceAccessMethod" NOT NULL,
+    "licence_name" TEXT NOT NULL,
+    "licence_url" TEXT,
+    "attribution_required" BOOLEAN NOT NULL DEFAULT false,
+    "share_alike_required" BOOLEAN NOT NULL DEFAULT false,
+    "commercial_use_status" "CommercialUseStatus" NOT NULL,
+    "derivative_database_requirement" TEXT,
+    "image_reuse_status" "CommercialUseStatus" NOT NULL,
+    "text_reuse_status" "CommercialUseStatus" NOT NULL,
+    "automated_access_allowed" BOOLEAN NOT NULL DEFAULT false,
+    "robots_reviewed_at" TIMESTAMP(3),
+    "terms_reviewed_at" TIMESTAMP(3),
+    "legal_review_status" "LegalReviewStatus" NOT NULL DEFAULT 'not_reviewed',
+    "approved_fields_json" JSONB NOT NULL,
+    "prohibited_fields_json" JSONB NOT NULL,
+    "required_attribution_text" TEXT,
+    "importer_enabled" BOOLEAN NOT NULL DEFAULT false,
+    "review_notes" TEXT,
+    "reviewed_by" UUID,
+    "reviewed_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "data_source_policies_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "import_jobs" (
+    "id" UUID NOT NULL,
+    "source_policy_id" UUID NOT NULL,
+    "importer_version" TEXT NOT NULL,
+    "status" "ImportJobStatus" NOT NULL DEFAULT 'queued',
+    "requested_scope_json" JSONB NOT NULL,
+    "started_at" TIMESTAMP(3),
+    "completed_at" TIMESTAMP(3),
+    "checkpoint_json" JSONB,
+    "imported_count" INTEGER NOT NULL DEFAULT 0,
+    "updated_count" INTEGER NOT NULL DEFAULT 0,
+    "skipped_count" INTEGER NOT NULL DEFAULT 0,
+    "rejected_count" INTEGER NOT NULL DEFAULT 0,
+    "warning_count" INTEGER NOT NULL DEFAULT 0,
+    "error_count" INTEGER NOT NULL DEFAULT 0,
+    "manifest_path" TEXT,
+    "created_by" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "import_jobs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "raw_import_records" (
+    "id" UUID NOT NULL,
+    "import_job_id" UUID NOT NULL,
+    "external_record_id" TEXT NOT NULL,
+    "payload_json" JSONB NOT NULL,
+    "payload_sha256" TEXT NOT NULL,
+    "source_updated_at" TIMESTAMP(3),
+    "processing_status" "ImportRecordStatus" NOT NULL DEFAULT 'pending',
+    "validation_errors_json" JSONB,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "raw_import_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "staged_products" (
+    "id" UUID NOT NULL,
+    "raw_import_record_id" UUID NOT NULL,
+    "mapped_fields_json" JSONB NOT NULL,
+    "source_derived_fields_json" JSONB,
+    "matching_candidates_json" JSONB,
+    "conflict_report_json" JSONB,
+    "proposed_action" "ProposedImportAction" NOT NULL,
+    "review_status" "StagingReviewStatus" NOT NULL DEFAULT 'pending_review',
+    "reviewed_by" UUID,
+    "reviewed_at" TIMESTAMP(3),
+
+    CONSTRAINT "staged_products_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "staged_ingredients" (
+    "id" UUID NOT NULL,
+    "raw_import_record_id" UUID NOT NULL,
+    "raw_name" TEXT NOT NULL,
+    "normalised_name" TEXT NOT NULL,
+    "candidate_ingredient_ids_json" JSONB,
+    "proposed_action" "ProposedImportAction" NOT NULL,
+    "review_status" "StagingReviewStatus" NOT NULL DEFAULT 'pending_review',
+
+    CONSTRAINT "staged_ingredients_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "external_chemical_records" (
+    "id" UUID NOT NULL,
+    "raw_import_record_id" UUID,
+    "source_policy_id" UUID NOT NULL,
+    "external_record_id" TEXT NOT NULL,
+    "query_json" JSONB NOT NULL,
+    "payload_sha256" TEXT NOT NULL,
+    "retrieved_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "endpoint_version" TEXT,
+    "candidate_matches_json" JSONB,
+    "mapping_confidence" DECIMAL(5,4),
+    "review_status" "StagingReviewStatus" NOT NULL DEFAULT 'pending_review',
+
+    CONSTRAINT "external_chemical_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "external_endpoint_records" (
+    "id" UUID NOT NULL,
+    "raw_import_record_id" UUID,
+    "external_chemical_record_id" UUID,
+    "endpoint_kind" "ExternalEndpointKind" NOT NULL,
+    "endpoint_json" JSONB NOT NULL,
+    "route" TEXT,
+    "dose_json" JSONB,
+    "test_system" TEXT,
+    "relevance_status" TEXT,
+    "review_status" "StagingReviewStatus" NOT NULL DEFAULT 'pending_review',
+
+    CONSTRAINT "external_endpoint_records_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "evidence_candidates" (
+    "id" UUID NOT NULL,
+    "source_policy_id" UUID NOT NULL,
+    "raw_import_record_id" UUID,
+    "ingredient_id" UUID,
+    "substance_id" UUID,
+    "proposed_claim_json" JSONB NOT NULL,
+    "identity_confidence" DECIMAL(5,4),
+    "evidence_relevance_status" TEXT NOT NULL,
+    "review_status" "StagingReviewStatus" NOT NULL DEFAULT 'pending_review',
+    "reviewer_notes" TEXT,
+    "reviewed_by" UUID,
+    "reviewed_at" TIMESTAMP(3),
+
+    CONSTRAINT "evidence_candidates_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "evidence_review_decisions" (
+    "id" UUID NOT NULL,
+    "evidence_candidate_id" UUID NOT NULL,
+    "decision" "StagingReviewStatus" NOT NULL,
+    "notes" TEXT,
+    "decided_by" UUID,
+    "decided_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "evidence_review_decisions_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
@@ -663,6 +853,60 @@ CREATE INDEX "audit_logs_entity_type_entity_id_idx" ON "audit_logs"("entity_type
 -- CreateIndex
 CREATE INDEX "correction_requests_entity_type_entity_id_idx" ON "correction_requests"("entity_type", "entity_id");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "data_source_policies_source_id_key" ON "data_source_policies"("source_id");
+
+-- CreateIndex
+CREATE INDEX "data_source_policies_source_access_class_idx" ON "data_source_policies"("source_access_class");
+
+-- CreateIndex
+CREATE INDEX "data_source_policies_legal_review_status_idx" ON "data_source_policies"("legal_review_status");
+
+-- CreateIndex
+CREATE INDEX "data_source_policies_importer_enabled_idx" ON "data_source_policies"("importer_enabled");
+
+-- CreateIndex
+CREATE INDEX "import_jobs_source_policy_id_idx" ON "import_jobs"("source_policy_id");
+
+-- CreateIndex
+CREATE INDEX "import_jobs_status_idx" ON "import_jobs"("status");
+
+-- CreateIndex
+CREATE INDEX "raw_import_records_payload_sha256_idx" ON "raw_import_records"("payload_sha256");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "raw_import_records_import_job_id_external_record_id_key" ON "raw_import_records"("import_job_id", "external_record_id");
+
+-- CreateIndex
+CREATE INDEX "staged_products_review_status_idx" ON "staged_products"("review_status");
+
+-- CreateIndex
+CREATE INDEX "staged_ingredients_normalised_name_idx" ON "staged_ingredients"("normalised_name");
+
+-- CreateIndex
+CREATE INDEX "staged_ingredients_review_status_idx" ON "staged_ingredients"("review_status");
+
+-- CreateIndex
+CREATE INDEX "external_chemical_records_payload_sha256_idx" ON "external_chemical_records"("payload_sha256");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "external_chemical_records_source_policy_id_external_record__key" ON "external_chemical_records"("source_policy_id", "external_record_id");
+
+-- CreateIndex
+CREATE INDEX "external_endpoint_records_endpoint_kind_idx" ON "external_endpoint_records"("endpoint_kind");
+
+-- CreateIndex
+CREATE INDEX "external_endpoint_records_review_status_idx" ON "external_endpoint_records"("review_status");
+
+-- CreateIndex
+CREATE INDEX "evidence_candidates_review_status_idx" ON "evidence_candidates"("review_status");
+
+-- CreateIndex
+CREATE INDEX "evidence_candidates_source_policy_id_idx" ON "evidence_candidates"("source_policy_id");
+
+-- CreateIndex
+CREATE INDEX "evidence_review_decisions_evidence_candidate_id_idx" ON "evidence_review_decisions"("evidence_candidate_id");
+
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -791,3 +1035,36 @@ ALTER TABLE "correction_requests" ADD CONSTRAINT "correction_requests_user_id_fk
 
 -- AddForeignKey
 ALTER TABLE "correction_requests" ADD CONSTRAINT "correction_requests_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "import_jobs" ADD CONSTRAINT "import_jobs_source_policy_id_fkey" FOREIGN KEY ("source_policy_id") REFERENCES "data_source_policies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "raw_import_records" ADD CONSTRAINT "raw_import_records_import_job_id_fkey" FOREIGN KEY ("import_job_id") REFERENCES "import_jobs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "staged_products" ADD CONSTRAINT "staged_products_raw_import_record_id_fkey" FOREIGN KEY ("raw_import_record_id") REFERENCES "raw_import_records"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "staged_ingredients" ADD CONSTRAINT "staged_ingredients_raw_import_record_id_fkey" FOREIGN KEY ("raw_import_record_id") REFERENCES "raw_import_records"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "external_chemical_records" ADD CONSTRAINT "external_chemical_records_raw_import_record_id_fkey" FOREIGN KEY ("raw_import_record_id") REFERENCES "raw_import_records"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "external_endpoint_records" ADD CONSTRAINT "external_endpoint_records_raw_import_record_id_fkey" FOREIGN KEY ("raw_import_record_id") REFERENCES "raw_import_records"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evidence_candidates" ADD CONSTRAINT "evidence_candidates_source_policy_id_fkey" FOREIGN KEY ("source_policy_id") REFERENCES "data_source_policies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evidence_candidates" ADD CONSTRAINT "evidence_candidates_raw_import_record_id_fkey" FOREIGN KEY ("raw_import_record_id") REFERENCES "raw_import_records"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evidence_candidates" ADD CONSTRAINT "evidence_candidates_ingredient_id_fkey" FOREIGN KEY ("ingredient_id") REFERENCES "ingredients"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evidence_candidates" ADD CONSTRAINT "evidence_candidates_substance_id_fkey" FOREIGN KEY ("substance_id") REFERENCES "chemical_substances"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "evidence_review_decisions" ADD CONSTRAINT "evidence_review_decisions_evidence_candidate_id_fkey" FOREIGN KEY ("evidence_candidate_id") REFERENCES "evidence_candidates"("id") ON DELETE CASCADE ON UPDATE CASCADE;

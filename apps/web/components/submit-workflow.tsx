@@ -11,7 +11,11 @@ import {
   Send,
   SlidersHorizontal,
 } from "lucide-react";
-import { ingredientFixtures, concernDimensionLabels, productFixtures } from "@cosmetic-lens/shared";
+import {
+  concernDimensionLabels,
+  productionIngredientRecords,
+  productionProductRecords,
+} from "@cosmetic-lens/shared";
 import {
   compareOrderedIngredientLists,
   createFormulaHash,
@@ -160,7 +164,7 @@ export function SubmitWorkflow() {
   const comparedProductVersionId = watch("comparedProductVersionId");
   const productVersionOptions = useMemo(
     () =>
-      productFixtures.flatMap((product) =>
+      productionProductRecords.flatMap((product) =>
         product.versions.map((version) => ({
           product,
           version,
@@ -185,7 +189,7 @@ export function SubmitWorkflow() {
 
   useEffect(() => {
     const tokens = parseIngredientList(correctedText);
-    setMatches(matchIngredientList(correctedText, ingredientFixtures));
+    setMatches(matchIngredientList(correctedText, productionIngredientRecords));
     createFormulaHash(tokens)
       .then(setFormulaHash)
       .catch(() => setFormulaHash(""));

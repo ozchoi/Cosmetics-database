@@ -29,11 +29,28 @@ flowchart LR
 - Ingredient matching: parser package API
 - Rating methodology: scoring package configuration
 - Authentication: signed-cookie credentials provider with a migration path to Auth.js or another maintained provider
-- Source import: manual/source registry first; no automated scraping in this milestone
+- Source import: `ProductDataImporter` providers gated by `DataSourcePolicy`; no unrestricted scraping
 
 ## Local Data Mode
 
-The first vertical slice uses audited development fixtures for public browsing so the site can run before Docker is started. PostgreSQL remains the production data contract through Prisma schema, migration, and seed script.
+The application starts with no preloaded consumer-facing products, brands, evidence claims, regulatory limits, or placeholder ratings. PostgreSQL remains the production data contract through Prisma schema and migrations. `pnpm db:bootstrap` creates required source-policy/reference rows only.
+
+Test records are isolated inside test files and use clearly synthetic names and domains. They are not loaded into development or production database setup.
+
+## Import Pipeline
+
+```mermaid
+flowchart TD
+  external["Approved external source"] --> raw["RawImportRecord"]
+  raw --> validate["Schema and policy validation"]
+  validate --> staging["StagedProduct / StagedIngredient / ExternalEndpointRecord"]
+  staging --> match["Identity matching and conflict detection"]
+  match --> queue["Reviewer queue"]
+  queue --> canonical["Canonical product, ingredient, or evidence tables"]
+  canonical --> search["Search index rebuild"]
+```
+
+Automated importers may run only when the source policy is approved or provisional, `importerEnabled` is true, licence and attribution metadata exist, and requested fields are limited to approved fields.
 
 ## Product Version Model
 

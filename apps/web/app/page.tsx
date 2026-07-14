@@ -1,19 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, Camera, Database, FlaskConical, Search, ShieldCheck } from "lucide-react";
 import { appConfig } from "@cosmetic-lens/shared";
-import { latestReviewedProducts } from "../lib/data";
-import {
-  buttonClass,
-  ConcernRangeCard,
-  InlineLink,
-  RegulatoryNotice,
-  SectionHeader,
-  VerificationStatusBadge,
-} from "../components/ui";
+import { buttonClass, InlineLink, RegulatoryNotice, SectionHeader } from "../components/ui";
 
 export default function HomePage() {
-  const products = latestReviewedProducts();
-
   return (
     <div>
       <section className="border-b border-[var(--line)] bg-white">
@@ -97,69 +87,37 @@ export default function HomePage() {
         <div className="container-shell">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <SectionHeader
-              eyebrow="已審核示範資料"
-              title="最新產品版本"
-              body="以下為虛構開發資料，用於展示產品版本與來源欄位。"
+              eyebrow="真實資料狀態"
+              title="等待已審核真實產品資料"
+              body="產品資料只會來自已批准可重用來源、用戶同意提交的包裝觀察，或 reviewer 連結真實來源後建立的記錄。系統不再載入虛構產品或示範評分。"
             />
             <Link
               className="font-semibold text-[var(--accent-strong)] underline underline-offset-4"
-              href="/search?q=香港"
+              href="/products"
             >
-              查看更多
+              瀏覽產品資料庫
             </Link>
           </div>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {products.map((product) => {
-              const version =
-                product.versions.find((item) => item.verificationStatus === "reviewed") ??
-                product.versions[0]!;
-              return (
-                <Link
-                  key={product.id}
-                  href={`/products/${product.slug}`}
-                  className="rounded-lg border border-[var(--line)] bg-white p-5 shadow-sm hover:border-[var(--accent)]"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm text-[var(--muted)]">{product.brand}</p>
-                    <VerificationStatusBadge status={version.verificationStatus} />
-                  </div>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-950">
-                    {product.preferredName}
-                  </h3>
-                  <p className="mt-3 text-sm leading-7 text-[var(--muted)]">
-                    {version.marketCode} · {version.category} ·{" "}
-                    {version.usageType === "leave_on" ? "免沖洗" : "沖洗型"}
-                  </p>
-                </Link>
-              );
-            })}
+          <div className="mt-8 rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface-soft)] p-6 text-sm leading-7 text-[var(--muted)]">
+            目前沒有預載 consumer-facing
+            產品。請使用上載流程提交真實包裝觀察，或由管理員完成來源審核後再匯入 Open Beauty Facts
+            staging records。
           </div>
         </div>
       </section>
 
       <section className="container-shell py-12">
         <div className="grid gap-4 md:grid-cols-3">
-          <ConcernRangeCard
-            title="資料不足"
-            status="未知，不是零分"
-            confidence="U"
-            completeness={0}
-            explanation="缺少危害、暴露或來源資料時，平台不會推斷為低潛在關注。"
-          />
-          <ConcernRangeCard
-            title="法規提示"
-            status="與數值評估分開"
-            confidence="U"
-            completeness={0.1}
-            explanation="法規限制、警告語及市場訊號會獨立顯示，並需要來源支援。"
-          />
-          <ConcernRangeCard
-            title="適用條件"
-            status="按產品情境解讀"
-            confidence="U"
-            completeness={0.2}
-            explanation="免沖洗、沖洗、眼周、噴霧、粉末、兒童用途及濃度狀態都會影響解讀。"
-          />
+          {[
+            ["資料不足", "缺少危害、暴露或來源資料時，平台不會推斷為低潛在關注。"],
+            ["法規提示", "法規限制、警告語及市場訊號會獨立顯示，並需要真實來源支援。"],
+            ["適用條件", "免沖洗、沖洗、眼周、噴霧、粉末、兒童用途及濃度狀態都會影響解讀。"],
+          ].map(([title, body]) => (
+            <article key={title} className="rounded-lg border border-[var(--line)] bg-white p-5">
+              <h2 className="font-semibold text-slate-950">{title}</h2>
+              <p className="mt-2 text-sm leading-7 text-[var(--muted)]">{body}</p>
+            </article>
+          ))}
         </div>
         <p className="mt-8 text-sm text-[var(--muted)]">
           詳見 <InlineLink href="/methodology">評估方法</InlineLink>、

@@ -16,15 +16,61 @@
 14. Study counts must not be used as a proxy for evidence quality.
 15. Ingredient-level concern signals must be re-evaluated in product context, including product form, body area, use pattern, exposure route, market, and known concentration conditions.
 
+## Source Access Classes
+
+### A. Open Structured Source
+
+API, export, or documented licence permits the intended reuse. Automated importers are allowed only after licence, attribution, robots/terms review, approved fields, and importer enablement are recorded in `DataSourcePolicy`.
+
+Examples: Open Beauty Facts, PubChem, EPA CompTox, and approved official open-data catalogues.
+
+### B. Official Reference Source
+
+Official regulatory, scientific, or governmental material may be manually entered or processed through an approved structured workflow. Public access to a page does not imply permission to copy a complete website or database.
+
+Examples: EU CosIng, SCCS opinions, ECHA, FDA, Hong Kong Customs, Hong Kong Drug Office, legislation, and regulatory notices.
+
+### C. Secondary Or Discovery Source
+
+Consumer, commercial, editorial, or third-party cosmetics information websites are discovery or cross-check sources by default.
+
+Examples: EWG Skin Deep, CosDNA, and other ingredient-checking websites.
+
+### D. User-contributed Primary Observation
+
+Real product packaging photos and label text submitted by users require consent, privacy handling, OCR review, formulation version handling, source provenance, and moderation before publication.
+
 ## Third-party Consumer Websites
 
-EWG Skin Deep, CosDNA, Open Beauty Facts, and similar consumer or community databases may be used only as secondary, cross-check, or discovery sources unless reuse rights and source quality have been reviewed.
+EWG Skin Deep, CosDNA, and similar consumer or commercial databases may be used only as secondary, cross-check, or discovery sources unless reuse rights and source quality have been reviewed.
 
 - Link to original pages where allowed.
 - Do not bulk copy proprietary descriptions, rating values, certification marks, tables, images, or product databases.
 - Do not imply endorsement, partnership, certification, or affiliation.
 - Prefer reviewing the official or primary sources cited by those websites.
 - Keep imported data blocked until reuse rights, provenance, and evidence relationship are approved.
+
+For EWG Skin Deep, Skin Deep scores and content must not be reproduced or distributed without required permission. For CosDNA, automated extraction and reuse permission is unknown unless written permission or a suitable documented licence is obtained.
+
+Preferred workflow:
+
+```text
+EWG or CosDNA page discovered
+        ↓
+Record as discovery source
+        ↓
+Locate underlying official, regulatory, database, or primary source
+        ↓
+Reviewer reads the underlying source
+        ↓
+Create a structured EvidenceCandidate
+        ↓
+Record route, dose, concentration, product type, test system, jurisdiction, and uncertainty
+        ↓
+Reviewer approves or rejects
+        ↓
+Create an active EvidenceClaim only after approval
+```
 
 ## Product Formulation Freshness
 
@@ -54,4 +100,4 @@ Historical formulations must be preserved. A newly submitted ingredient list for
 - Academic studies
 - Official regulatory notices
 
-No automated scraping is implemented in this milestone.
+Open Beauty Facts, PubChem, and EPA CompTox use explicit provider workflows. EWG Skin Deep and CosDNA are configured as `reference_only_no_import`.

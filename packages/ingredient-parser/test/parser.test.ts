@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ingredientFixtures } from "@cosmetic-lens/shared";
+import type { IngredientRecord } from "@cosmetic-lens/shared";
 import {
   compareOrderedIngredientLists,
   createFormulaHash,
@@ -9,6 +9,42 @@ import {
   normalizeName,
   parseIngredientList,
 } from "../src/index";
+
+const syntheticIngredientFixtures: IngredientRecord[] = [
+  {
+    id: "test-ing-alpha",
+    slug: "synthetic-alpha",
+    canonicalInciName: "SYNTHETIC ALPHA",
+    preferredEnglishName: "Synthetic Alpha",
+    preferredZhHantHkName: "測試甲成分",
+    ingredientType: "defined_chemical",
+    functions: ["測試用途"],
+    identifiers: [{ kind: "CAS", value: "000-00-1" }],
+    aliases: [
+      {
+        name: "Synthetic Alpha",
+        languageCode: "en",
+        nameType: "inci",
+        reviewed: true,
+      },
+      {
+        name: "Test Alpha",
+        languageCode: "en",
+        nameType: "common",
+        reviewed: true,
+      },
+      {
+        name: "測試甲成分",
+        languageCode: "zh-Hant",
+        regionCode: "HK",
+        nameType: "preferred",
+        reviewed: true,
+      },
+    ],
+    descriptionZhHant: "測試環境專用合成記錄，不會載入開發或生產資料庫。",
+    reviewStatus: "reviewed",
+  },
+];
 
 describe("normalisation", () => {
   it("normalises Unicode punctuation, whitespace, and CI numbers", () => {
@@ -79,31 +115,33 @@ describe("ingredient list comparison", () => {
 
 describe("ingredient matcher", () => {
   it("matches Traditional Chinese aliases", () => {
-    const [result] = matchIngredientList("甘油", ingredientFixtures);
+    const [result] = matchIngredientList("測試甲成分", syntheticIngredientFixtures);
     expect(result?.status).toBe("confirmed");
-    expect(result?.ingredient?.slug).toBe("glycerin");
+    expect(result?.ingredient?.slug).toBe("synthetic-alpha");
     expect(result?.method).toBe("exact_reviewed_alias");
   });
 
   it("matches English INCI and CAS identifiers", () => {
-    const inci = matchIngredientList("GLYCERIN", ingredientFixtures)[0];
-    const cas = matchIngredientList("56-81-5", ingredientFixtures)[0];
+    const inci = matchIngredientList("SYNTHETIC ALPHA", syntheticIngredientFixtures)[0];
+    const cas = matchIngredientList("000-00-1", syntheticIngredientFixtures)[0];
 
     expect(inci?.method).toBe("exact_canonical_inci");
     expect(cas?.method).toBe("exact_identifier");
   });
 
   it("does not auto-confirm a weak fuzzy candidate", () => {
-    const [token] = parseIngredientList("Glyzerin");
-    const result = matchIngredientToken(token!, ingredientFixtures, { autoConfirmThreshold: 0.95 });
+    const [token] = parseIngredientList("Synthetik Alpha");
+    const result = matchIngredientToken(token!, syntheticIngredientFixtures, {
+      autoConfirmThreshold: 0.95,
+    });
 
     expect(result.status).toBe("uncertain");
     expect(result.ingredient).toBeUndefined();
-    expect(result.candidates[0]?.ingredient.slug).toBe("glycerin");
+    expect(result.candidates[0]?.ingredient.slug).toBe("synthetic-alpha");
   });
 
   it("keeps unresolved tokens for reviewer queues", () => {
-    const [result] = matchIngredientList("Unobtainium Complex", ingredientFixtures);
+    const [result] = matchIngredientList("Unobtainium Complex", syntheticIngredientFixtures);
     expect(result?.status).toBe("unresolved");
     expect(result?.candidates).toEqual([]);
   });

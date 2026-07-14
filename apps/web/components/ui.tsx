@@ -131,9 +131,11 @@ export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
     professional_database: "專業資料庫",
     brand_document: "品牌文件",
     package_label: "包裝標籤",
+    open_product_database: "開放產品資料庫",
     secondary_website: "第三方消費者網站",
     discovery_source: "發現來源",
     community_submission: "社群提交",
+    reference_only_no_import: "只供參考，不匯入",
   };
   const relationshipLabels: Record<NonNullable<SourceRecord["evidenceRelationship"]>, string> = {
     primary: "主要來源",
@@ -157,9 +159,6 @@ export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
         <span className="rounded-md bg-sky-50 px-2 py-1 text-xs text-sky-900">
           {relationshipLabel}
         </span>
-        {source.isDemo ? (
-          <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">開發示範</span>
-        ) : null}
       </div>
       <h3 className="mt-3 font-semibold text-slate-950">{source.title}</h3>
       <dl className="mt-3 grid gap-2 text-sm text-[var(--muted)] sm:grid-cols-2">
@@ -242,6 +241,7 @@ export function VerificationStatusBadge({ status }: Readonly<{ status: Verificat
     reviewed: "已審核",
     needs_correction: "需要修正",
     rejected: "已拒絕",
+    externally_imported_unverified: "外部匯入未核實",
   };
   return (
     <span className="inline-flex items-center gap-1 rounded-md border border-[var(--line)] bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
