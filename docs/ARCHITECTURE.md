@@ -34,3 +34,9 @@ flowchart LR
 ## Local Data Mode
 
 The first vertical slice uses audited development fixtures for public browsing so the site can run before Docker is started. PostgreSQL remains the production data contract through Prisma schema, migration, and seed script.
+
+## Product Version Model
+
+Public ProductVersion records preserve market, barcode, category, form, use pattern, body area, label observation date, independent verification date, brand confirmation date, source ids, evidence confidence, data completeness, and concern-dimension values.
+
+Freshness is derived from observation and verification dates, newer conflicting submissions, and market-specific evidence. Historical formulations are not deleted or overwritten. A changed user-submitted ingredient list creates a possible reformulation review task with added, removed, and reordered ingredients for reviewer action.

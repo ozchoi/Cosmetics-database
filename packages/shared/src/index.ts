@@ -113,7 +113,8 @@ export interface SourceRecord {
   commercialReuseStatus: "allowed" | "unknown" | "restricted" | "not_applicable";
   reviewStatus: "draft" | "reviewed" | "superseded";
   evidenceGrade: EvidenceGrade;
-  evidenceRelationship?: "primary" | "supporting" | "conflicting" | "secondary" | "discovery" | "cross_check";
+  evidenceRelationship?:
+    "primary" | "supporting" | "conflicting" | "secondary" | "discovery" | "cross_check";
   isDemo?: boolean;
 }
 

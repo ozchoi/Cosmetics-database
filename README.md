@@ -1,6 +1,6 @@
 # 成分透視
 
-Cosmetic Ingredient Lens 是一個以繁體中文（香港）為主的化妝品成分資料平台 MVP。它支援產品／成分搜尋、標籤相片 OCR、成分解析與配對、資料不足提示、來源追蹤、產品配方版本，以及待審核提交流程。
+Cosmetic Ingredient Lens 是一個以繁體中文（香港）為主的化妝品成分資料平台 MVP。它支援產品／成分搜尋、產品瀏覽、標籤相片 OCR、成分解析與配對、資料不足提示、來源追蹤、產品配方版本，以及待審核提交流程。
 
 此平台報告「潛在關注」、「證據可信度」、「資料完整度」及「適用條件」。它不提供醫療診斷、懷孕安全聲明、治療建議，亦不使用單一安全分數。
 
@@ -35,6 +35,15 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+Useful MVP routes:
+
+- `/` search across products and ingredients
+- `/products` browse public product versions by category, brand, use pattern, market, freshness, data completeness, evidence confidence, and individual concern dimension
+- `/submit` analyse or submit a label after OCR correction
+- `/sources` inspect source category, locator, evidence relationship, evidence grade, and reuse status
+
+EWG Skin Deep, CosDNA, Open Beauty Facts, and similar sites are treated only as benchmark, secondary, cross-check, or discovery sources unless reuse rights are approved. The app does not copy their visual identity, proprietary scores, certification marks, descriptions, images, tables, or product databases.
 
 ## Scripts
 

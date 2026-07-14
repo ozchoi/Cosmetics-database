@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const formulationDiffItemSchema = z.object({
+  raw: z.string().min(1).max(240),
+  normalized: z.string().max(240),
+  fromPosition: z.number().int().positive().optional(),
+  toPosition: z.number().int().positive().optional(),
+});
+
 export const contributionSchema = z.object({
   contributionMode: z.enum(["instant_only", "text_only", "processed_image_and_text"]),
   consentConfirmed: z.boolean(),
@@ -15,6 +22,17 @@ export const contributionSchema = z.object({
   bodyArea: z.array(z.string().min(1)).min(1),
   formulaHash: z.string().startsWith("sha256:"),
   imageSha256: z.string().optional(),
+  comparedProductVersionId: z.string().max(120).optional(),
+  formulationDiffSummary: z
+    .object({
+      comparedProductVersionId: z.string().max(120),
+      reviewTaskType: z.literal("possible_reformulation_review"),
+      hasChanges: z.boolean(),
+      added: z.array(formulationDiffItemSchema).max(300),
+      removed: z.array(formulationDiffItemSchema).max(300),
+      reordered: z.array(formulationDiffItemSchema).max(300),
+    })
+    .optional(),
   notes: z.string().max(2000).optional(),
 });
 

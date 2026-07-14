@@ -113,6 +113,41 @@ async function PendingSubmissions({ label }: Readonly<{ label: string }>) {
                   </ul>
                 </div>
               </div>
+              {submission.formulationDiffSummary ? (
+                <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-amber-950">可能改配方覆核任務</h3>
+                      <p className="mt-1 text-sm text-amber-900">
+                        基準版本：{submission.formulationDiffSummary.comparedProductVersionId}
+                      </p>
+                    </div>
+                    <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-amber-900">
+                      {submission.formulationDiffSummary.hasChanges ? "有成分差異" : "未見成分差異"}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <AdminDiffList
+                      title="新增"
+                      items={submission.formulationDiffSummary.added}
+                      emptyLabel="沒有新增"
+                    />
+                    <AdminDiffList
+                      title="移除"
+                      items={submission.formulationDiffSummary.removed}
+                      emptyLabel="沒有移除"
+                    />
+                    <AdminDiffList
+                      title="排序改變"
+                      items={submission.formulationDiffSummary.reordered}
+                      emptyLabel="沒有排序改變"
+                    />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-amber-950">
+                    審核員需建立新 ProductVersion 或標記同一配方；不可自動覆寫既有版本。
+                  </p>
+                </div>
+              ) : null}
               <form action={reviewAction} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto]">
                 <input type="hidden" name="id" value={submission.id} />
                 <input
@@ -137,6 +172,38 @@ async function PendingSubmissions({ label }: Readonly<{ label: string }>) {
         </div>
       )}
     </AdminShell>
+  );
+}
+
+function AdminDiffList({
+  title,
+  items,
+  emptyLabel,
+}: Readonly<{
+  title: string;
+  items: Array<{ raw: string; fromPosition?: number | undefined; toPosition?: number | undefined }>;
+  emptyLabel: string;
+}>) {
+  return (
+    <div className="rounded-md bg-white p-3 text-sm">
+      <h4 className="font-semibold text-amber-950">{title}</h4>
+      {items.length > 0 ? (
+        <ul className="mt-2 grid gap-1 text-amber-900">
+          {items.map((item) => (
+            <li key={`${item.raw}-${item.fromPosition ?? "new"}-${item.toPosition ?? "old"}`}>
+              {item.raw}
+              <span className="ml-2 text-xs">
+                {item.fromPosition ? `原 #${item.fromPosition}` : ""}
+                {item.fromPosition && item.toPosition ? " → " : ""}
+                {item.toPosition ? `新 #${item.toPosition}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-amber-900">{emptyLabel}</p>
+      )}
+    </div>
   );
 }
 

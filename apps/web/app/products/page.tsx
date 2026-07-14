@@ -2,7 +2,10 @@ import Link from "next/link";
 import { ArrowUpDown, Filter } from "lucide-react";
 import {
   browseProducts,
+  productFormDisplay,
   productBrowseOptions,
+  usageTypeDisplay,
+  verificationStatusDisplay,
   type DataFreshnessStatus,
   type ProductBrowseFilters,
 } from "../../lib/data";
@@ -18,7 +21,10 @@ import {
 } from "../../components/ui";
 import type { ConcernDimension } from "@cosmetic-lens/shared";
 
-const field = (params: Record<string, string | string[] | undefined>, key: string): string | undefined => {
+const field = (
+  params: Record<string, string | string[] | undefined>,
+  key: string,
+): string | undefined => {
   const value = params[key];
   return Array.isArray(value) ? value[0] : value || undefined;
 };
@@ -27,19 +33,31 @@ export default async function ProductsPage({
   searchParams,
 }: Readonly<{ searchParams: Promise<Record<string, string | string[] | undefined>> }>) {
   const params = await searchParams;
+  const category = field(params, "category");
+  const brand = field(params, "brand");
+  const usageType = field(params, "usageType");
+  const productForm = field(params, "productForm");
+  const bodyArea = field(params, "bodyArea");
+  const market = field(params, "market");
+  const verificationStatus = field(params, "verificationStatus");
+  const freshness = field(params, "freshness");
+  const evidenceConfidence = field(params, "evidenceConfidence");
+  const minCompleteness = field(params, "minCompleteness");
+  const concernDimension = field(params, "concernDimension");
+  const sort = field(params, "sort");
   const filters: ProductBrowseFilters = {
-    category: field(params, "category"),
-    brand: field(params, "brand"),
-    usageType: field(params, "usageType"),
-    productForm: field(params, "productForm"),
-    bodyArea: field(params, "bodyArea"),
-    market: field(params, "market"),
-    verificationStatus: field(params, "verificationStatus"),
-    freshness: field(params, "freshness") as DataFreshnessStatus | undefined,
-    evidenceConfidence: field(params, "evidenceConfidence"),
-    minCompleteness: field(params, "minCompleteness") ? Number(field(params, "minCompleteness")) : undefined,
-    concernDimension: field(params, "concernDimension") as ConcernDimension | undefined,
-    sort: field(params, "sort"),
+    ...(category ? { category } : {}),
+    ...(brand ? { brand } : {}),
+    ...(usageType ? { usageType } : {}),
+    ...(productForm ? { productForm } : {}),
+    ...(bodyArea ? { bodyArea } : {}),
+    ...(market ? { market } : {}),
+    ...(verificationStatus ? { verificationStatus } : {}),
+    ...(freshness ? { freshness: freshness as DataFreshnessStatus } : {}),
+    ...(evidenceConfidence ? { evidenceConfidence } : {}),
+    ...(minCompleteness ? { minCompleteness: Number(minCompleteness) } : {}),
+    ...(concernDimension ? { concernDimension: concernDimension as ConcernDimension } : {}),
+    ...(sort ? { sort } : {}),
   };
   const options = productBrowseOptions();
   const products = browseProducts(filters);
@@ -58,17 +76,40 @@ export default async function ProductsPage({
           <h2 className="font-semibold text-slate-950">篩選</h2>
         </div>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
-          <Select name="category" label="產品類別" value={filters.category} options={options.categories} />
+          <Select
+            name="category"
+            label="產品類別"
+            value={filters.category}
+            options={options.categories}
+          />
           <Select name="brand" label="品牌" value={filters.brand} options={options.brands} />
-          <Select name="usageType" label="免沖洗／沖洗" value={filters.usageType} options={options.usageTypes} />
-          <Select name="productForm" label="產品形態" value={filters.productForm} options={options.productForms} />
-          <Select name="bodyArea" label="使用部位" value={filters.bodyArea} options={options.bodyAreas} />
+          <Select
+            name="usageType"
+            label="免沖洗／沖洗"
+            value={filters.usageType}
+            options={options.usageTypes}
+            formatOption={usageTypeDisplay}
+          />
+          <Select
+            name="productForm"
+            label="產品形態"
+            value={filters.productForm}
+            options={options.productForms}
+            formatOption={productFormDisplay}
+          />
+          <Select
+            name="bodyArea"
+            label="使用部位"
+            value={filters.bodyArea}
+            options={options.bodyAreas}
+          />
           <Select name="market" label="市場" value={filters.market} options={options.markets} />
           <Select
             name="verificationStatus"
             label="核實狀態"
             value={filters.verificationStatus}
             options={options.verificationStatuses}
+            formatOption={verificationStatusDisplay}
           />
           <Select
             name="freshness"
@@ -81,6 +122,7 @@ export default async function ProductsPage({
             label="證據可信度"
             value={filters.evidenceConfidence}
             options={options.evidenceGrades}
+            formatOption={(option) => `證據 ${option}`}
           />
           <label className="grid gap-1 text-sm">
             <span className="font-semibold text-slate-800">最低資料完整度</span>
@@ -160,7 +202,9 @@ export default async function ProductsPage({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm text-[var(--muted)]">{product.brand}</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950">{product.preferredName}</h3>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950">
+                      {product.preferredName}
+                    </h3>
                     <p className="mt-2 text-sm text-[var(--muted)]">
                       {version.versionLabel} · {version.category} · {version.marketCode}
                     </p>
@@ -187,7 +231,10 @@ export default async function ProductsPage({
             ))
           ) : (
             <div className="lg:col-span-2">
-              <EmptyDataState title="沒有相符產品" body="請放寬篩選條件；未公開或待審核版本不會在此列表顯示。" />
+              <EmptyDataState
+                title="沒有相符產品"
+                body="請放寬篩選條件；未公開或待審核版本不會在此列表顯示。"
+              />
             </div>
           )}
         </div>
@@ -201,7 +248,14 @@ function Select({
   label,
   value,
   options,
-}: Readonly<{ name: string; label: string; value?: string; options: string[] }>) {
+  formatOption = (option: string) => option,
+}: Readonly<{
+  name: string;
+  label: string;
+  value?: string | undefined;
+  options: string[];
+  formatOption?: ((option: string) => string) | undefined;
+}>) {
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-semibold text-slate-800">{label}</span>
@@ -213,7 +267,7 @@ function Select({
         <option value="">不限</option>
         {options.map((option) => (
           <option key={option} value={option}>
-            {option}
+            {formatOption(option)}
           </option>
         ))}
       </select>

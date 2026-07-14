@@ -141,12 +141,42 @@ export const allDimensionLabels = Object.entries(concernDimensionLabels) as Arra
   [ConcernDimension, string]
 >;
 
+export const usageTypeDisplay = (value: string): string => {
+  const labels: Record<string, string> = {
+    leave_on: "免沖洗",
+    rinse_off: "沖洗型",
+    mixed: "混合",
+    unknown: "未知",
+  };
+  return labels[value] ?? value;
+};
+
+export const productFormDisplay = (value: string): string => {
+  const labels: Record<string, string> = {
+    cream: "膏霜",
+    liquid: "液體",
+    gel: "凝膠",
+    powder: "粉末",
+    spray: "噴霧",
+    aerosol: "氣霧",
+    stick: "棒狀",
+    unknown: "未知",
+  };
+  return labels[value] ?? value;
+};
+
+export const verificationStatusDisplay = (value: string): string => {
+  const labels: Record<string, string> = {
+    pending_review: "待審核",
+    reviewed: "已審核",
+    needs_correction: "需要修正",
+    rejected: "已拒絕",
+  };
+  return labels[value] ?? value;
+};
+
 export type DataFreshnessStatus =
-  | "最新已核實"
-  | "最近核實"
-  | "可能已更新"
-  | "舊配方"
-  | "核實日期不明";
+  "最新已核實" | "最近核實" | "可能已更新" | "舊配方" | "核實日期不明";
 
 export interface ProductBrowseFilters {
   category?: string;
@@ -171,7 +201,8 @@ export interface ProductBrowseItem {
   isPossiblyStale: boolean;
 }
 
-const parseDate = (value?: string): Date | undefined => (value ? new Date(`${value}T00:00:00Z`) : undefined);
+const parseDate = (value?: string): Date | undefined =>
+  value ? new Date(`${value}T00:00:00Z`) : undefined;
 
 const yearsBetween = (older: Date, newer: Date): number =>
   (newer.getTime() - older.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
@@ -233,8 +264,11 @@ export const productVersionFreshness = (
 };
 
 export const productBrowseOptions = () => {
-  const versions = productFixtures.flatMap((product) => product.versions.map((version) => ({ product, version })));
-  const unique = (values: string[]) => [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const versions = productFixtures.flatMap((product) =>
+    product.versions.map((version) => ({ product, version })),
+  );
+  const unique = (values: string[]) =>
+    [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
   return {
     categories: unique(versions.map(({ version }) => version.category)),
     brands: unique(productFixtures.map((product) => product.brand)),
@@ -272,10 +306,13 @@ export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem
     if (filters.productForm && version.productForm !== filters.productForm) return false;
     if (filters.bodyArea && !version.bodyArea.includes(filters.bodyArea)) return false;
     if (filters.market && version.marketCode !== filters.market) return false;
-    if (filters.verificationStatus && version.verificationStatus !== filters.verificationStatus) return false;
+    if (filters.verificationStatus && version.verificationStatus !== filters.verificationStatus)
+      return false;
     if (filters.freshness && freshness !== filters.freshness) return false;
-    if (filters.evidenceConfidence && version.evidenceConfidence !== filters.evidenceConfidence) return false;
-    if (filters.minCompleteness !== undefined && version.dataCompleteness < filters.minCompleteness) return false;
+    if (filters.evidenceConfidence && version.evidenceConfidence !== filters.evidenceConfidence)
+      return false;
+    if (filters.minCompleteness !== undefined && version.dataCompleteness < filters.minCompleteness)
+      return false;
     return true;
   });
 
@@ -287,12 +324,19 @@ export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem
       return right.version.dataCompleteness - left.version.dataCompleteness;
     }
     if (selectedSort === "recently_submitted") {
-      return (parseDate(right.version.submittedAt)?.getTime() ?? 0) - (parseDate(left.version.submittedAt)?.getTime() ?? 0);
+      return (
+        (parseDate(right.version.submittedAt)?.getTime() ?? 0) -
+        (parseDate(left.version.submittedAt)?.getTime() ?? 0)
+      );
     }
     if (selectedSort === "dimension_low" || selectedSort === "dimension_high") {
       const dimension = filters.concernDimension;
-      const leftValue = dimension ? (left.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY) : 0;
-      const rightValue = dimension ? (right.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY) : 0;
+      const leftValue = dimension
+        ? (left.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY)
+        : 0;
+      const rightValue = dimension
+        ? (right.version.concernDimensionValues[dimension] ?? Number.POSITIVE_INFINITY)
+        : 0;
       return selectedSort === "dimension_low" ? leftValue - rightValue : rightValue - leftValue;
     }
     return (

@@ -5,10 +5,16 @@ import {
   getIngredient,
   getProduct,
   getSource,
+  productFormDisplay,
   productRatingsForDisplay,
+  productVersionFreshness,
+  usageTypeDisplay,
 } from "../../../lib/data";
 import {
   ConcernRangeCard,
+  DataCompletenessIndicator,
+  DataFreshnessBadge,
+  EvidenceGradeBadge,
   IngredientName,
   RegulatoryNotice,
   SectionHeader,
@@ -28,6 +34,7 @@ export default async function ProductPage({
     product.versions.find((version) => version.id === query.version) ??
     product.versions.find((version) => version.publicationStatus === "published") ??
     product.versions[0]!;
+  const freshness = productVersionFreshness(selectedVersion);
   const ratings = productRatingsForDisplay();
   const sources = selectedVersion.sourceIds
     .map(getSource)
@@ -49,7 +56,10 @@ export default async function ProductPage({
               同一產品可因市場、日期、條碼或包裝版本而有不同成分表。
             </p>
           </div>
-          <VerificationStatusBadge status={selectedVersion.verificationStatus} />
+          <div className="flex flex-wrap gap-2">
+            <VerificationStatusBadge status={selectedVersion.verificationStatus} />
+            <DataFreshnessBadge status={freshness.status} />
+          </div>
         </div>
         <form className="mt-5">
           <label htmlFor="version" className="text-sm font-semibold text-slate-800">
@@ -80,6 +90,12 @@ export default async function ProductPage({
           </p>
         </form>
 
+        {freshness.isPossiblyStale ? (
+          <div className="mt-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm leading-7 text-amber-950">
+            此配方資料可能已過時。購買或使用前，請對照實物包裝上的成分表。
+          </div>
+        ) : null}
+
         <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="font-semibold text-slate-800">市場</dt>
@@ -96,8 +112,8 @@ export default async function ProductPage({
           <div>
             <dt className="font-semibold text-slate-800">形態／使用方式</dt>
             <dd className="mt-1 text-[var(--muted)]">
-              {selectedVersion.productForm} ·{" "}
-              {selectedVersion.usageType === "leave_on" ? "免沖洗" : "沖洗型"}
+              {productFormDisplay(selectedVersion.productForm)} ·{" "}
+              {usageTypeDisplay(selectedVersion.usageType)}
             </dd>
           </div>
           <div>
@@ -108,11 +124,48 @@ export default async function ProductPage({
             <dt className="font-semibold text-slate-800">觀察日期</dt>
             <dd className="mt-1 text-[var(--muted)]">{selectedVersion.labelObservedAt}</dd>
           </div>
+          <div>
+            <dt className="font-semibold text-slate-800">獨立核實日期</dt>
+            <dd className="mt-1 text-[var(--muted)]">
+              {selectedVersion.lastIndependentVerificationAt ?? "未提供"}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">品牌確認日期</dt>
+            <dd className="mt-1 text-[var(--muted)]">
+              {selectedVersion.brandConfirmedAt ?? "未提供"}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">較新衝突提交</dt>
+            <dd className="mt-1 text-[var(--muted)]">
+              {selectedVersion.conflictingNewerSubmissionCount ?? 0} 宗
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">市場配方證據</dt>
+            <dd className="mt-1 text-[var(--muted)]">
+              {selectedVersion.marketSpecificEvidenceCount ?? 0} 項
+            </dd>
+          </div>
           <div className="sm:col-span-2">
             <dt className="font-semibold text-slate-800">配方 Hash</dt>
             <dd className="mt-1 break-all text-[var(--muted)]">{selectedVersion.formulaHash}</dd>
           </div>
+          <div>
+            <dt className="font-semibold text-slate-800">資料新鮮度</dt>
+            <dd className="mt-1 text-[var(--muted)]">{freshness.reason}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">證據可信度</dt>
+            <dd className="mt-1">
+              <EvidenceGradeBadge grade={selectedVersion.evidenceConfidence} />
+            </dd>
+          </div>
         </dl>
+        <div className="mt-6 max-w-md">
+          <DataCompletenessIndicator value={selectedVersion.dataCompleteness} />
+        </div>
       </section>
 
       <section className="mt-8">
@@ -203,20 +256,27 @@ export default async function ProductPage({
           <div className="rounded-lg border border-[var(--line)] bg-white p-5">
             <h3 className="font-semibold text-slate-950">版本紀錄</h3>
             <ul className="mt-4 grid gap-3 text-sm">
-              {product.versions.map((version) => (
-                <li key={version.id} className="rounded-md bg-[var(--surface-soft)] p-3">
-                  <Link
-                    href={`/products/${product.slug}?version=${version.id}`}
-                    className="font-semibold text-[var(--accent-strong)]"
-                  >
-                    {version.versionLabel}
-                  </Link>
-                  <p className="mt-1 text-[var(--muted)]">
-                    {version.labelObservedAt} · {version.marketCode} ·{" "}
-                    {version.formulaHash.slice(0, 22)}...
-                  </p>
-                </li>
-              ))}
+              {product.versions.map((version) => {
+                const versionFreshness = productVersionFreshness(version);
+                return (
+                  <li key={version.id} className="rounded-md bg-[var(--surface-soft)] p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <Link
+                        href={`/products/${product.slug}?version=${version.id}`}
+                        className="font-semibold text-[var(--accent-strong)]"
+                      >
+                        {version.versionLabel}
+                      </Link>
+                      <DataFreshnessBadge status={versionFreshness.status} />
+                    </div>
+                    <p className="mt-1 text-[var(--muted)]">
+                      {version.labelObservedAt} · {version.marketCode} ·{" "}
+                      {version.formulaHash.slice(0, 22)}...
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">{versionFreshness.reason}</p>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         </div>

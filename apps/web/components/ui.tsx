@@ -135,14 +135,17 @@ export function SourceCitation({ source }: Readonly<{ source: SourceRecord }>) {
     discovery_source: "發現來源",
     community_submission: "社群提交",
   };
-  const relationshipLabel = {
+  const relationshipLabels: Record<NonNullable<SourceRecord["evidenceRelationship"]>, string> = {
     primary: "主要來源",
     supporting: "支持來源",
     conflicting: "衝突來源",
     secondary: "次級來源",
     discovery: "發現來源",
     cross_check: "交叉核對",
-  }[source.evidenceRelationship ?? ""] ?? "未標示";
+  };
+  const relationshipLabel = source.evidenceRelationship
+    ? relationshipLabels[source.evidenceRelationship]
+    : "未標示";
 
   return (
     <article className="rounded-lg border border-[var(--line)] bg-white p-4">

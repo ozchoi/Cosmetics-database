@@ -163,6 +163,7 @@ enum ClaimSourceRelationship {
   conflicting
   secondary
   discovery
+  cross_check
 }
 
 enum RatingStatus {
@@ -267,11 +268,19 @@ model ProductVersion {
   bodyArea            String[]                    @map("body_area")
   targetUserGroup     String?                     @map("target_user_group")
   labelObservedAt     DateTime?                   @map("label_observed_at")
+  lastIndependentVerificationAt DateTime?         @map("last_independent_verification_at")
+  brandConfirmedAt    DateTime?                   @map("brand_confirmed_at")
+  conflictingNewerSubmissionCount Int             @default(0) @map("conflicting_newer_submission_count")
+  marketSpecificEvidenceCount Int                 @default(0) @map("market_specific_evidence_count")
   validFrom           DateTime?                   @map("valid_from")
   validTo             DateTime?                   @map("valid_to")
   formulaHash         String                      @map("formula_hash")
   verificationStatus  VerificationStatus          @default(pending_review) @map("verification_status")
   publicationStatus   PublicationStatus           @default(draft) @map("publication_status")
+  submittedAt         DateTime?                   @map("submitted_at")
+  evidenceConfidence  EvidenceGrade               @default(U) @map("evidence_confidence")
+  dataCompleteness    Decimal                     @default(0) @map("data_completeness") @db.Decimal(5, 4)
+  concernDimensionValues Json?                     @map("concern_dimension_values_json")
   createdAt           DateTime                    @default(now()) @map("created_at")
   updatedAt           DateTime                    @updatedAt @map("updated_at")
   product             Product                     @relation(fields: [productId], references: [id], onDelete: Restrict)
@@ -280,10 +289,16 @@ model ProductVersion {
   observations        IngredientListObservation[]
   ingredients         ProductIngredient[]
   ratingRuns          RatingRun[]
+  comparisonSubmissions Submission[]              @relation("SubmissionComparedProductVersion")
 
   @@index([productId])
   @@index([barcode])
   @@index([formulaHash])
+  @@index([marketCode])
+  @@index([verificationStatus])
+  @@index([publicationStatus])
+  @@index([labelObservedAt])
+  @@index([lastIndependentVerificationAt])
   @@unique([productId, marketCode, formulaHash])
   @@map("product_versions")
 }
@@ -294,6 +309,9 @@ model Submission {
   status           SubmissionStatus            @default(pending_review)
   contributionMode ContributionMode            @map("contribution_mode")
   notes            String?
+  comparedProductVersionId String?             @map("compared_product_version_id") @db.Uuid
+  formulationDiffJson Json?                    @map("formulation_diff_json")
+  reviewTaskType   String?                     @map("review_task_type")
   submittedAt      DateTime                    @default(now()) @map("submitted_at")
   reviewedAt       DateTime?                   @map("reviewed_at")
   reviewedBy       String?                     @map("reviewed_by") @db.Uuid
@@ -302,11 +320,13 @@ model Submission {
   updatedAt        DateTime                    @updatedAt @map("updated_at")
   user             User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
   reviewer         User?                       @relation("SubmissionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  comparedProductVersion ProductVersion?       @relation("SubmissionComparedProductVersion", fields: [comparedProductVersionId], references: [id], onDelete: SetNull)
   images           ProductImage[]
   ocrJobs          OcrJob[]
   observations     IngredientListObservation[]
 
   @@index([status])
+  @@index([comparedProductVersionId])
   @@map("submissions")
 }
 
@@ -534,6 +554,8 @@ model Source {
   attributionText        String?                @map("attribution_text")
   archivedSnapshotSha256 String?                @map("archived_snapshot_sha256")
   reviewStatus           ReviewStatus           @default(draft) @map("review_status")
+  evidenceRelationship   ClaimSourceRelationship? @map("evidence_relationship")
+  evidenceGrade          EvidenceGrade          @default(U) @map("evidence_grade")
   isDemo                 Boolean                @default(false) @map("is_demo")
   createdAt              DateTime               @default(now()) @map("created_at")
   updatedAt              DateTime               @updatedAt @map("updated_at")

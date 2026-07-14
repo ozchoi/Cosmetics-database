@@ -11,11 +11,13 @@ import {
   Send,
   SlidersHorizontal,
 } from "lucide-react";
-import { ingredientFixtures, concernDimensionLabels } from "@cosmetic-lens/shared";
+import { ingredientFixtures, concernDimensionLabels, productFixtures } from "@cosmetic-lens/shared";
 import {
+  compareOrderedIngredientLists,
   createFormulaHash,
   matchIngredientList,
   parseIngredientList,
+  type IngredientListDiffItem,
   type IngredientMatchResult,
 } from "@cosmetic-lens/ingredient-parser";
 import {
@@ -50,6 +52,7 @@ interface FormFields {
   productForm: "cream" | "liquid" | "gel" | "powder" | "spray" | "aerosol" | "stick" | "unknown";
   usageType: "leave_on" | "rinse_off" | "mixed" | "unknown";
   bodyArea: string;
+  comparedProductVersionId: string;
   notes: string;
   contributionMode: ContributionMode;
   consentConfirmed: boolean;
@@ -145,6 +148,7 @@ export function SubmitWorkflow() {
       productForm: "liquid",
       usageType: "leave_on",
       bodyArea: "面部",
+      comparedProductVersionId: "",
       notes: "",
       contributionMode: "instant_only",
       consentConfirmed: false,
@@ -153,6 +157,31 @@ export function SubmitWorkflow() {
 
   const contributionMode = watch("contributionMode");
   const consentConfirmed = watch("consentConfirmed");
+  const comparedProductVersionId = watch("comparedProductVersionId");
+  const productVersionOptions = useMemo(
+    () =>
+      productFixtures.flatMap((product) =>
+        product.versions.map((version) => ({
+          product,
+          version,
+        })),
+      ),
+    [],
+  );
+  const comparedProductVersionOption = useMemo(
+    () => productVersionOptions.find(({ version }) => version.id === comparedProductVersionId),
+    [comparedProductVersionId, productVersionOptions],
+  );
+  const formulationDiff = useMemo(() => {
+    if (!comparedProductVersionOption || correctedText.trim().length < 2) return undefined;
+    const baselineText = comparedProductVersionOption.version.ingredients
+      .map((ingredient) => ingredient.rawLabelToken)
+      .join(", ");
+    return compareOrderedIngredientLists(
+      parseIngredientList(baselineText),
+      parseIngredientList(correctedText),
+    );
+  }, [comparedProductVersionOption, correctedText]);
 
   useEffect(() => {
     const tokens = parseIngredientList(correctedText);
@@ -249,6 +278,17 @@ export function SubmitWorkflow() {
     }
     setIsBusy(true);
     setStatus("正在提交待審核資料...");
+    const formulationDiffSummary =
+      values.comparedProductVersionId && formulationDiff
+        ? {
+            comparedProductVersionId: values.comparedProductVersionId,
+            reviewTaskType: "possible_reformulation_review" as const,
+            hasChanges: formulationDiff.hasChanges,
+            added: formulationDiff.added,
+            removed: formulationDiff.removed,
+            reordered: formulationDiff.reordered,
+          }
+        : undefined;
     const response = await fetch("/api/submit", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -262,6 +302,8 @@ export function SubmitWorkflow() {
           .filter(Boolean),
         formulaHash,
         imageSha256: images.find((item) => item.processedSha256)?.processedSha256,
+        comparedProductVersionId: values.comparedProductVersionId || undefined,
+        ...(formulationDiffSummary ? { formulationDiffSummary } : {}),
       }),
     });
     const result = (await response.json()) as { id?: string; error?: string };
@@ -551,7 +593,53 @@ export function SubmitWorkflow() {
               <option value="unknown">未知</option>
             </select>
           </label>
+          <label className="grid gap-1 text-sm md:col-span-2">
+            <span className="font-semibold text-slate-800">比對現有產品版本（可選）</span>
+            <select
+              className="min-h-10 rounded-md border border-[var(--line)] px-3"
+              {...register("comparedProductVersionId")}
+            >
+              <option value="">不比對現有版本</option>
+              {productVersionOptions.map(({ product, version }) => (
+                <option key={version.id} value={version.id}>
+                  {product.brand} · {product.preferredName} · {version.versionLabel}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
+
+        {comparedProductVersionOption && formulationDiff ? (
+          <div className="mt-5 rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-950">可能改配方比對</h3>
+                <p className="mt-1 text-sm leading-7 text-[var(--muted)]">
+                  基準版本：{comparedProductVersionOption.product.preferredName} ·{" "}
+                  {comparedProductVersionOption.version.versionLabel}
+                </p>
+              </div>
+              <span className="rounded-md bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {formulationDiff.hasChanges ? "需覆核差異" : "未見成分順序差異"}
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-7 text-slate-700">
+              {formulationDiff.hasChanges
+                ? "偵測到與所選版本不同；提交後會建立可能改配方覆核任務。"
+                : "與所選版本成分順序相同，可能是同一配方補充核實。"}
+              系統不會覆寫現有版本；提交後仍需人工審核才可公開。
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <DiffList title="新增成分" items={formulationDiff.added} emptyLabel="沒有新增" />
+              <DiffList title="移除成分" items={formulationDiff.removed} emptyLabel="沒有移除" />
+              <DiffList
+                title="排序改變"
+                items={formulationDiff.reordered}
+                emptyLabel="沒有排序改變"
+              />
+            </div>
+          </div>
+        ) : null}
 
         <fieldset className="mt-5 grid gap-3">
           <legend className="font-semibold text-slate-800">保存及提交選擇</legend>
@@ -620,6 +708,34 @@ export function SubmitWorkflow() {
           {status}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function DiffList({
+  title,
+  items,
+  emptyLabel,
+}: Readonly<{ title: string; items: IngredientListDiffItem[]; emptyLabel: string }>) {
+  return (
+    <div className="rounded-md bg-white p-3">
+      <h4 className="text-sm font-semibold text-slate-800">{title}</h4>
+      {items.length > 0 ? (
+        <ul className="mt-2 grid gap-2 text-sm text-slate-700">
+          {items.map((item) => (
+            <li key={`${item.raw}-${item.fromPosition ?? "new"}-${item.toPosition ?? "old"}`}>
+              <span className="font-medium">{item.raw}</span>
+              <span className="ml-2 text-xs text-[var(--muted)]">
+                {item.fromPosition ? `原 #${item.fromPosition}` : ""}
+                {item.fromPosition && item.toPosition ? " → " : ""}
+                {item.toPosition ? `新 #${item.toPosition}` : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-sm text-[var(--muted)]">{emptyLabel}</p>
+      )}
     </div>
   );
 }

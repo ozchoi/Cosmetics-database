@@ -62,7 +62,7 @@ CREATE TYPE "EvidenceGrade" AS ENUM ('A', 'B', 'C', 'D', 'U');
 CREATE TYPE "ClaimStatus" AS ENUM ('draft', 'reviewed', 'active', 'superseded', 'disputed');
 
 -- CreateEnum
-CREATE TYPE "ClaimSourceRelationship" AS ENUM ('primary', 'supporting', 'conflicting', 'secondary', 'discovery');
+CREATE TYPE "ClaimSourceRelationship" AS ENUM ('primary', 'supporting', 'conflicting', 'secondary', 'discovery', 'cross_check');
 
 -- CreateEnum
 CREATE TYPE "RatingStatus" AS ENUM ('calculated', 'insufficient_data', 'not_applicable');
@@ -150,11 +150,19 @@ CREATE TABLE "product_versions" (
     "body_area" TEXT[],
     "target_user_group" TEXT,
     "label_observed_at" TIMESTAMP(3),
+    "last_independent_verification_at" TIMESTAMP(3),
+    "brand_confirmed_at" TIMESTAMP(3),
+    "conflicting_newer_submission_count" INTEGER NOT NULL DEFAULT 0,
+    "market_specific_evidence_count" INTEGER NOT NULL DEFAULT 0,
     "valid_from" TIMESTAMP(3),
     "valid_to" TIMESTAMP(3),
     "formula_hash" TEXT NOT NULL,
     "verification_status" "VerificationStatus" NOT NULL DEFAULT 'pending_review',
     "publication_status" "PublicationStatus" NOT NULL DEFAULT 'draft',
+    "submitted_at" TIMESTAMP(3),
+    "evidence_confidence" "EvidenceGrade" NOT NULL DEFAULT 'U',
+    "data_completeness" DECIMAL(5,4) NOT NULL DEFAULT 0,
+    "concern_dimension_values_json" JSONB,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
@@ -168,6 +176,9 @@ CREATE TABLE "submissions" (
     "status" "SubmissionStatus" NOT NULL DEFAULT 'pending_review',
     "contribution_mode" "ContributionMode" NOT NULL,
     "notes" TEXT,
+    "compared_product_version_id" UUID,
+    "formulation_diff_json" JSONB,
+    "review_task_type" TEXT,
     "submitted_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "reviewed_at" TIMESTAMP(3),
     "reviewed_by" UUID,
@@ -370,6 +381,8 @@ CREATE TABLE "sources" (
     "attribution_text" TEXT,
     "archived_snapshot_sha256" TEXT,
     "review_status" "ReviewStatus" NOT NULL DEFAULT 'draft',
+    "evidence_relationship" "ClaimSourceRelationship",
+    "evidence_grade" "EvidenceGrade" NOT NULL DEFAULT 'U',
     "is_demo" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -555,10 +568,28 @@ CREATE INDEX "product_versions_barcode_idx" ON "product_versions"("barcode");
 CREATE INDEX "product_versions_formula_hash_idx" ON "product_versions"("formula_hash");
 
 -- CreateIndex
+CREATE INDEX "product_versions_market_code_idx" ON "product_versions"("market_code");
+
+-- CreateIndex
+CREATE INDEX "product_versions_verification_status_idx" ON "product_versions"("verification_status");
+
+-- CreateIndex
+CREATE INDEX "product_versions_publication_status_idx" ON "product_versions"("publication_status");
+
+-- CreateIndex
+CREATE INDEX "product_versions_label_observed_at_idx" ON "product_versions"("label_observed_at");
+
+-- CreateIndex
+CREATE INDEX "product_versions_last_independent_verification_at_idx" ON "product_versions"("last_independent_verification_at");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "product_versions_product_id_market_code_formula_hash_key" ON "product_versions"("product_id", "market_code", "formula_hash");
 
 -- CreateIndex
 CREATE INDEX "submissions_status_idx" ON "submissions"("status");
+
+-- CreateIndex
+CREATE INDEX "submissions_compared_product_version_id_idx" ON "submissions"("compared_product_version_id");
 
 -- CreateIndex
 CREATE INDEX "product_images_sha256_idx" ON "product_images"("sha256");
@@ -652,6 +683,9 @@ ALTER TABLE "submissions" ADD CONSTRAINT "submissions_user_id_fkey" FOREIGN KEY 
 
 -- AddForeignKey
 ALTER TABLE "submissions" ADD CONSTRAINT "submissions_reviewed_by_fkey" FOREIGN KEY ("reviewed_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "submissions" ADD CONSTRAINT "submissions_compared_product_version_id_fkey" FOREIGN KEY ("compared_product_version_id") REFERENCES "product_versions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_images" ADD CONSTRAINT "product_images_submission_id_fkey" FOREIGN KEY ("submission_id") REFERENCES "submissions"("id") ON DELETE CASCADE ON UPDATE CASCADE;

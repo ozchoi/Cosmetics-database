@@ -32,6 +32,8 @@ async function seedSources(): Promise<void> {
       licenceStatus: source.licenceStatus,
       commercialReuseStatus: source.commercialReuseStatus,
       reviewStatus: source.reviewStatus,
+      evidenceRelationship: source.evidenceRelationship ?? null,
+      evidenceGrade: source.evidenceGrade,
       isDemo: source.isDemo ?? false,
     };
 
@@ -130,8 +132,18 @@ async function seedProducts(): Promise<void> {
           bodyArea: version.bodyArea,
           targetUserGroup: version.targetUserGroup,
           labelObservedAt: new Date(version.labelObservedAt),
+          lastIndependentVerificationAt: version.lastIndependentVerificationAt
+            ? new Date(version.lastIndependentVerificationAt)
+            : null,
+          brandConfirmedAt: version.brandConfirmedAt ? new Date(version.brandConfirmedAt) : null,
+          conflictingNewerSubmissionCount: version.conflictingNewerSubmissionCount ?? 0,
+          marketSpecificEvidenceCount: version.marketSpecificEvidenceCount ?? 0,
           verificationStatus: version.verificationStatus,
           publicationStatus: version.publicationStatus,
+          submittedAt: version.submittedAt ? new Date(version.submittedAt) : null,
+          evidenceConfidence: version.evidenceConfidence,
+          dataCompleteness: version.dataCompleteness,
+          concernDimensionValues: version.concernDimensionValues,
         },
         create: {
           productId: savedProduct.id,
@@ -143,9 +155,19 @@ async function seedProducts(): Promise<void> {
           bodyArea: version.bodyArea,
           targetUserGroup: version.targetUserGroup,
           labelObservedAt: new Date(version.labelObservedAt),
+          lastIndependentVerificationAt: version.lastIndependentVerificationAt
+            ? new Date(version.lastIndependentVerificationAt)
+            : null,
+          brandConfirmedAt: version.brandConfirmedAt ? new Date(version.brandConfirmedAt) : null,
+          conflictingNewerSubmissionCount: version.conflictingNewerSubmissionCount ?? 0,
+          marketSpecificEvidenceCount: version.marketSpecificEvidenceCount ?? 0,
           formulaHash: version.formulaHash,
           verificationStatus: version.verificationStatus,
           publicationStatus: version.publicationStatus,
+          submittedAt: version.submittedAt ? new Date(version.submittedAt) : null,
+          evidenceConfidence: version.evidenceConfidence,
+          dataCompleteness: version.dataCompleteness,
+          concernDimensionValues: version.concernDimensionValues,
         },
       });
 
