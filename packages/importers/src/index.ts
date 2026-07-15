@@ -348,7 +348,7 @@ export class OpenBeautyFactsImporter implements ProductDataImporter {
     const response = (await withRetries(() =>
       this.fetchJson(url.toString(), {
         headers: {
-          "user-agent": "CosmeticIngredientLens/0.1 importer (contact: admin@example.test)",
+          "user-agent": "CosmeticIngredientDatabase/0.1 importer (contact: admin@example.test)",
         },
       }),
     )) as { products?: OpenBeautyFactsRecord[] };
@@ -506,7 +506,7 @@ export class PubChemEnrichmentProvider {
   async findByReviewedCas(cas: string): Promise<PubChemCandidate> {
     const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(cas)}/cids/JSON`;
     const payload = (await this.fetchJson(url, {
-      headers: { "user-agent": "CosmeticIngredientLens/0.1 pubchem-enricher" },
+      headers: { "user-agent": "CosmeticIngredientDatabase/0.1 pubchem-enricher" },
     })) as { IdentifierList?: { CID?: number[] } };
     const cid = payload.IdentifierList?.CID?.[0];
     if (!cid) throw new Error("No PubChem CID found for reviewed CAS.");

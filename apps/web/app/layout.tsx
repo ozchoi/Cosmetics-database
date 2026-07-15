@@ -4,9 +4,23 @@ import { Camera, Database, Search, ShieldCheck } from "lucide-react";
 import { appConfig } from "@cosmetic-lens/shared";
 import "./globals.css";
 
+const siteDescription =
+  "搜尋化妝品及成分、上載產品標籤相片、核對 OCR 結果，並從健康、致敏、環境、法規及證據可信度等角度理解成分資料。";
+
 export const metadata: Metadata = {
-  title: `${appConfig.productName} | ${appConfig.productEnglishName}`,
-  description: "以來源、證據可信度及資料完整度呈現化妝品成分潛在關注的資料平台。",
+  applicationName: appConfig.productName,
+  title: {
+    default: `${appConfig.productName} | ${appConfig.productEnglishName}`,
+    template: `%s | ${appConfig.productName}`,
+  },
+  description: siteDescription,
+  openGraph: {
+    title: `${appConfig.productName} | ${appConfig.productEnglishName}`,
+    description: siteDescription,
+    siteName: appConfig.productName,
+    locale: "zh_HK",
+    type: "website",
+  },
 };
 
 const navItems = [
@@ -18,9 +32,28 @@ const navItems = [
 ];
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: appConfig.productName,
+    alternateName: appConfig.productEnglishName,
+    applicationCategory: "HealthApplication",
+    inLanguage: appConfig.locale,
+    description: siteDescription,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "HKD",
+    },
+  };
+
   return (
     <html lang={appConfig.locale}>
       <body>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         <a className="skip-link" href="#main">
           跳到主要內容
         </a>

@@ -10,9 +10,9 @@ export default function HomePage() {
         <div className="container-shell grid gap-8 py-12 md:grid-cols-[1.1fr_0.9fr] md:items-center md:py-16">
           <div>
             <SectionHeader
-              eyebrow="zh-Hant-HK 成分資料平台"
+              eyebrow="化妝品成分與風險資訊"
               title={appConfig.productName}
-              body="搜尋產品與成分、上載標籤相片、核對 OCR 文字，並以證據可信度、資料完整度及適用條件理解成分潛在關注。"
+              body="搜尋化妝品及成分、上載產品標籤相片、核對 OCR 結果，並從健康、致敏、環境、法規及證據可信度等角度理解成分資料。"
             />
             <form action="/search" className="mt-8 flex flex-col gap-3 sm:flex-row">
               <label className="sr-only" htmlFor="q">

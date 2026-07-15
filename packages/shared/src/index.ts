@@ -1,6 +1,6 @@
 export const appConfig = {
-  productName: process.env["APP_NAME"] ?? "成分透視",
-  productEnglishName: process.env["APP_ENGLISH_NAME"] ?? "Cosmetic Ingredient Lens",
+  productName: process.env["APP_NAME"] ?? "化妝品成分資料平台",
+  productEnglishName: process.env["APP_ENGLISH_NAME"] ?? "Cosmetic Ingredient Database",
   locale: "zh-Hant-HK",
   formulationStaleYears: Number(process.env["FORMULATION_STALE_YEARS"] ?? 3),
 } as const;

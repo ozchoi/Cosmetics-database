@@ -4,7 +4,7 @@
 
 - This repository is empty except for Git metadata, so the MVP is scaffolded from scratch.
 - The default public locale is `zh-Hant-HK`; developer documentation and code identifiers use English.
-- The product names `成分透視` and `Cosmetic Ingredient Lens` are configurable.
+- The product names `化妝品成分資料平台` and `Cosmetic Ingredient Database` are configurable.
 - PostgreSQL is the production data store; normal bootstrap scripts do not create consumer-facing product or evidence data.
 - Browser-side OCR is the default free provider; deterministic OCR fixtures support isolated tests.
 - Production-facing data must come from approved reusable sources, real package-label observations, user submissions retained with consent, reviewer-entered source-backed records, or approved official chemical identity APIs.

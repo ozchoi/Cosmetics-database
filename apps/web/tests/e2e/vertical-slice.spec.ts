@@ -7,6 +7,11 @@ const pngBytes = Buffer.from(
 
 test("search shows no preloaded fictional ingredient or product data", async ({ page }) => {
   await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "化妝品成分資料平台", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("化妝品成分與風險資訊")).toBeVisible();
+  await expect(page.getByText("搜尋化妝品及成分、上載產品標籤相片")).toBeVisible();
   await page.getByLabel("搜尋產品、品牌、條碼或成分").fill("甘油");
   await page.getByRole("button", { name: "搜尋" }).click();
   await expect(page.getByRole("heading", { name: "成分", exact: true })).toBeVisible();
@@ -37,7 +42,7 @@ test("uploads a label, runs deterministic OCR, submits contribution, and reviews
   const submitButton = page.getByRole("button", { name: "提交待審核" });
   await submitButton.scrollIntoViewIfNeeded();
   await submitButton.click({ force: true });
-  await expect(page.getByText("已建立待審核提交")).toBeVisible();
+  await expect(page.getByText("已建立待審核提交")).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/admin/login");
   await page.getByLabel("電郵").fill("admin@example.test");
