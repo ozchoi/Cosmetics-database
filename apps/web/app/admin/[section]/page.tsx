@@ -11,8 +11,10 @@ import {
 } from "../../../components/ui";
 import {
   dataSourcePolicyRecords,
+  productionCoverageRecords,
   productionIngredientRecords,
   productionProductRecords,
+  productionReviewIssueRecords,
   productionSourceRecords,
 } from "@cosmetic-lens/shared";
 import { matchIngredientList } from "@cosmetic-lens/ingredient-parser";
@@ -21,6 +23,9 @@ const sectionLabels: Record<string, string> = {
   "pending-submissions": "待審核提交",
   "ocr-review": "OCR 審核",
   "unresolved-tokens": "未解析成分",
+  "import-history": "匯入紀錄",
+  "coverage-matrix": "覆蓋矩陣",
+  "research-gaps": "研究缺口",
   ingredients: "成分 CRUD",
   "ingredient-names": "名稱及別名",
   "substance-mappings": "物質映射",
@@ -56,6 +61,9 @@ export default async function AdminSectionPage({
   if (section === "pending-submissions") return <PendingSubmissions label={label} />;
   if (section === "ocr-review") return <OcrReview label={label} />;
   if (section === "unresolved-tokens") return <UnresolvedTokens label={label} />;
+  if (section === "import-history") return <ImportHistory label={label} />;
+  if (section === "coverage-matrix") return <CoverageMatrix label={label} />;
+  if (section === "research-gaps") return <ResearchGaps label={label} />;
   if (section === "ingredients") return <IngredientsAdmin label={label} />;
   if (section === "products" || section === "product-versions" || section === "brands")
     return <ProductsAdmin label={label} />;
@@ -244,16 +252,38 @@ async function UnresolvedTokens({ label }: Readonly<{ label: string }>) {
       .filter((match) => match.status !== "confirmed")
       .map((match) => ({ submission, match })),
   );
+  const seedUnresolved = productionProductRecords.flatMap((product) =>
+    product.versions.flatMap((version) =>
+      version.ingredients
+        .filter((ingredient) => ingredient.matchStatus === "unresolved")
+        .map((ingredient) => ({ product, version, ingredient })),
+    ),
+  );
 
   return (
     <AdminShell
       label={label}
       body="未知或低信心成分需人工解決，可建立別名，但不能直接建立未審核 canonical ingredient。"
     >
-      {unresolved.length === 0 ? (
+      {unresolved.length === 0 && seedUnresolved.length === 0 ? (
         <EmptyDataState title="沒有未解析成分" body="不確定配對會在這裏排隊。" />
       ) : (
         <div className="grid gap-3">
+          {seedUnresolved.map(({ product, version, ingredient }) => (
+            <article
+              key={`${version.id}-${ingredient.position}`}
+              className="rounded-lg border border-amber-300 bg-amber-50 p-4"
+            >
+              <h2 className="font-semibold text-amber-950">{ingredient.rawLabelToken}</h2>
+              <p className="mt-1 text-sm text-amber-900">
+                Seed 產品：{product.brand} · {product.preferredName} · #{ingredient.position}
+              </p>
+              <p className="mt-2 text-sm text-amber-900">
+                狀態：{ingredient.rawMatchStatus ?? "unresolved"} · 建議：保留原始
+                token，下一批成分身份審核處理。
+              </p>
+            </article>
+          ))}
           {unresolved.map(({ submission, match }) => (
             <article
               key={`${submission.id}-${match.token.position}`}
@@ -271,6 +301,97 @@ async function UnresolvedTokens({ label }: Readonly<{ label: string }>) {
           ))}
         </div>
       )}
+    </AdminShell>
+  );
+}
+
+function ImportHistory({ label }: Readonly<{ label: string }>) {
+  const productTokens = productionProductRecords.flatMap((product) =>
+    product.versions.flatMap((version) => version.ingredients),
+  );
+  return (
+    <AdminShell
+      label={label}
+      body="顯示已驗證 evidence seed bundle 的本地匯入摘要。正式資料庫匯入仍需 DATABASE_URL。"
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        {[
+          ["來源", productionSourceRecords.length],
+          ["成分", productionIngredientRecords.length],
+          ["產品版本", productionProductRecords.flatMap((product) => product.versions).length],
+          ["產品成分 token", productTokens.length],
+          [
+            "未解析 token",
+            productTokens.filter((item) => item.matchStatus === "unresolved").length,
+          ],
+          ["審核／研究 issue", productionReviewIssueRecords.length],
+        ].map(([title, count]) => (
+          <article key={title} className="rounded-lg border border-[var(--line)] bg-white p-4">
+            <p className="text-sm text-[var(--muted)]">{title}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{count}</p>
+          </article>
+        ))}
+      </div>
+    </AdminShell>
+  );
+}
+
+function CoverageMatrix({ label }: Readonly<{ label: string }>) {
+  return (
+    <AdminShell
+      label={label}
+      body="R=已審閱 exact claim；I=身份或索引；C=候選或發現；P=待抽取；—=本 seed pack 無記錄。此頁用於研究規劃，不是安全分數。"
+    >
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-white">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-[var(--surface-soft)] text-slate-700">
+            <tr>
+              <th className="px-3 py-2">成分</th>
+              <th className="px-3 py-2">Reviewed</th>
+              <th className="px-3 py-2">Pending</th>
+              <th className="px-3 py-2">Product Label</th>
+              <th className="px-3 py-2">備註</th>
+            </tr>
+          </thead>
+          <tbody>
+            {productionCoverageRecords.map((row) => (
+              <tr key={row.ingredient_id} className="border-t border-[var(--line)]">
+                <td className="px-3 py-2 font-semibold text-slate-950">{row.canonical_inci}</td>
+                <td className="px-3 py-2">{row.Reviewed_Count ?? "0"}</td>
+                <td className="px-3 py-2">{row.Pending_Count ?? "0"}</td>
+                <td className="px-3 py-2">{row.Product_Label_Observed ?? "—"}</td>
+                <td className="px-3 py-2 text-[var(--muted)]">{row.notes ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </AdminShell>
+  );
+}
+
+function ResearchGaps({ label }: Readonly<{ label: string }>) {
+  return (
+    <AdminShell label={label} body="保留匯入時已知的身份映射、材料形態、環境資料及產品驗證缺口。">
+      <div className="grid gap-3">
+        {productionReviewIssueRecords.map((issue) => (
+          <article key={issue.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="font-semibold text-slate-950">{issue.issueZh}</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {issue.entityType} · {issue.entityId} · {issue.issueCategory}
+                </p>
+              </div>
+              <span className="rounded-md bg-[var(--surface-soft)] px-2 py-1 text-xs font-semibold text-slate-700">
+                {issue.priority}
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-[var(--muted)]">{issue.impactZh}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-800">{issue.recommendedActionZh}</p>
+          </article>
+        ))}
+      </div>
     </AdminShell>
   );
 }

@@ -3,10 +3,10 @@ import { notFound } from "next/navigation";
 import {
   allDimensionLabels,
   getIngredient,
+  getIngredientDemoEvidence,
   getProduct,
   getSource,
   productFormDisplay,
-  productRatingsForDisplay,
   productVersionFreshness,
   usageTypeDisplay,
 } from "../../../lib/data";
@@ -35,10 +35,23 @@ export default async function ProductPage({
     product.versions.find((version) => version.publicationStatus === "published") ??
     product.versions[0]!;
   const freshness = productVersionFreshness(selectedVersion);
-  const ratings = productRatingsForDisplay();
   const sources = selectedVersion.sourceIds
     .map(getSource)
     .filter((source): source is NonNullable<typeof source> => Boolean(source));
+  const evidenceDrivers = selectedVersion.ingredients
+    .flatMap((productIngredient) => {
+      const ingredient = productIngredient.ingredientSlug
+        ? getIngredient(productIngredient.ingredientSlug)
+        : undefined;
+      if (!ingredient) return [];
+      return getIngredientDemoEvidence(ingredient.slug)
+        .filter((evidence) => evidence.claimStatus === "active")
+        .map((evidence) => ({ ingredient, evidence }));
+    })
+    .slice(0, 6);
+  const unresolvedCount = selectedVersion.ingredients.filter(
+    (ingredient) => ingredient.matchStatus === "unresolved",
+  ).length;
 
   return (
     <div className="container-shell py-10">
@@ -96,6 +109,12 @@ export default async function ProductPage({
           </div>
         ) : null}
 
+        {selectedVersion.sourceWarningZh ? (
+          <div className="mt-5 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm leading-7 text-sky-950">
+            {selectedVersion.sourceWarningZh}
+          </div>
+        ) : null}
+
         <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <dt className="font-semibold text-slate-800">市場</dt>
@@ -147,6 +166,16 @@ export default async function ProductPage({
             <dd className="mt-1 text-[var(--muted)]">
               {selectedVersion.marketSpecificEvidenceCount ?? 0} 項
             </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">實物包裝核實</dt>
+            <dd className="mt-1 text-[var(--muted)]">
+              {selectedVersion.packagePhotoVerified ? "已核實" : "實物包裝尚未核實"}
+            </dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-slate-800">未解析 token</dt>
+            <dd className="mt-1 text-[var(--muted)]">{unresolvedCount} 項保留待審核</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="font-semibold text-slate-800">配方 Hash</dt>
@@ -206,28 +235,32 @@ export default async function ProductPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="text-xl font-semibold text-slate-950">多維度潛在關注</h2>
+        <h2 className="text-xl font-semibold text-slate-950">主要關注來源</h2>
         <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-          MVP 不顯示單一總分。現有開發種子未加入真實毒理或法規資料，因此多數維度會顯示資料不足。
+          此處只列出已連到來源的成分情境聲明；不計算單一整體安全分數。資料不足不代表零潛在關注。
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {ratings.map((rating) => {
-            const range =
-              rating.scoreMin !== undefined && rating.scoreMax !== undefined
-                ? `${rating.scoreMin.toFixed(2)}–${rating.scoreMax.toFixed(2)}`
-                : undefined;
-            return (
-              <ConcernRangeCard
-                key={rating.dimension}
-                title={rating.labelZhHant}
-                status={rating.concernBand}
-                confidence={rating.confidenceGrade}
-                completeness={rating.dataCompleteness}
-                explanation={rating.explanationZhHant}
-                {...(range ? { range } : {})}
-              />
-            );
-          })}
+          {evidenceDrivers.length > 0 ? (
+            evidenceDrivers.map(({ ingredient, evidence }) => {
+              const source = evidence.sourceIds.map(getSource).find(Boolean);
+              const range = evidence.concentration;
+              return (
+                <ConcernRangeCard
+                  key={`${ingredient.id}-${evidence.id}`}
+                  title={`${ingredient.preferredZhHantHkName} · ${evidence.endpoint ?? "證據聲明"}`}
+                  status={evidence.contextLabelZh ?? "適用條件需核對"}
+                  confidence={evidence.evidenceGrade}
+                  completeness={evidence.dataCompleteness}
+                  explanation={`${evidence.summaryZhHant}${source ? `（來源：${source.publisher}）` : ""}`}
+                  {...(range ? { range } : {})}
+                />
+              );
+            })
+          ) : (
+            <p className="rounded-lg border border-[var(--line)] bg-white p-5 text-sm text-[var(--muted)]">
+              暫未有足夠已核實資料。這不代表產品沒有潛在關注。
+            </p>
+          )}
         </div>
       </section>
 

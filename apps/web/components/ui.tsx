@@ -241,6 +241,7 @@ export function VerificationStatusBadge({ status }: Readonly<{ status: Verificat
     reviewed: "已審核",
     needs_correction: "需要修正",
     rejected: "已拒絕",
+    brand_page: "品牌網頁資料",
     externally_imported_unverified: "外部匯入未核實",
   };
   return (

@@ -1,0 +1,62 @@
+{
+  "importerVersion": "cosmetics-evidence-seed-v0.1-importer-v1",
+  "bundlePath": "/Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1",
+  "checksumValid": true,
+  "dryRun": false,
+  "databaseWriteAttempted": false,
+  "counts": {
+    "sources": 45,
+    "ingredients": 25,
+    "aliasesAndSubstanceMappings": 48,
+    "evidenceClaims": 56,
+    "regulatoryRules": 4,
+    "productVersions": 4,
+    "productIngredientTokens": 92,
+    "unresolvedTokens": 61,
+    "coverageRows": 25,
+    "conflictGapRows": 15,
+    "reviewIssues": 19
+  },
+  "insertCount": 394,
+  "updateCount": 0,
+  "skipCount": 0,
+  "rejectCount": 0,
+  "issues": [
+    {
+      "file": "product_seeds.csv",
+      "recordId": "PRD-0001-V1",
+      "category": "formula_hash_mismatch",
+      "severity": "warning",
+      "message": "Recalculated formula hash differs from source value; source value is preserved and review is required.",
+      "originalValue": "5c17a0102728ab8441a5f4c770eb3fff6cf4c063096a97e249bb61ef4e1516fb",
+      "recommendedAction": "Recalculated 45e53e09a10caa91c05e7fbd10f4049a7ac545d926163cf327e1b8f207f60fb8. Confirm the bundle hash method before publication."
+    },
+    {
+      "file": "product_seeds.csv",
+      "recordId": "PRD-0002-V1",
+      "category": "formula_hash_mismatch",
+      "severity": "warning",
+      "message": "Recalculated formula hash differs from source value; source value is preserved and review is required.",
+      "originalValue": "493bddc29977b48767572a3bd3146d7c33c61916572b5e01af05c0e59171ccbd",
+      "recommendedAction": "Recalculated 95b802744ed3d30a0e9d6306a424a7d7ccf2358bfe6aafa425557aa183ad95db. Confirm the bundle hash method before publication."
+    },
+    {
+      "file": "product_seeds.csv",
+      "recordId": "PRD-0003-V1",
+      "category": "formula_hash_mismatch",
+      "severity": "warning",
+      "message": "Recalculated formula hash differs from source value; source value is preserved and review is required.",
+      "originalValue": "a9f9b7ef852c8f4b9fb78b0bfb90429018c1816addc146ad37dc95f52453b489",
+      "recommendedAction": "Recalculated adec4edcd852e137e4e7bbfa30c5f04e4d8df8ca19e2eea31679efb6bb5ba3e4. Confirm the bundle hash method before publication."
+    },
+    {
+      "file": "product_seeds.csv",
+      "recordId": "PRD-0004-V1",
+      "category": "formula_hash_mismatch",
+      "severity": "warning",
+      "message": "Recalculated formula hash differs from source value; source value is preserved and review is required.",
+      "originalValue": "8357ead6df32efd008582850b2cc14305b13a8b8daf891fb41a98b6199da31da",
+      "recommendedAction": "Recalculated 6ab2552be21ffd63990b307a15fbf9d67c6642eaf10d42a2a524b2bc3861ad2f. Confirm the bundle hash method before publication."
+    }
+  ]
+}

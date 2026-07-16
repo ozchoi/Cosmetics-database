@@ -123,7 +123,11 @@ export const searchProducts = (query: string): SearchResult<ProductRecord>[] =>
 export const latestReviewedProducts = (): ProductRecord[] =>
   productionProductRecords
     .filter((product) =>
-      product.versions.some((version) => version.verificationStatus === "reviewed"),
+      product.versions.some(
+        (version) =>
+          version.verificationStatus === "reviewed" ||
+          version.publicationStatus === "published_with_source_warning",
+      ),
     )
     .slice(0, 3);
 
@@ -160,6 +164,7 @@ export const productFormDisplay = (value: string): string => {
     spray: "噴霧",
     aerosol: "氣霧",
     stick: "棒狀",
+    serum: "精華",
     unknown: "未知",
   };
   return labels[value] ?? value;
@@ -171,6 +176,7 @@ export const verificationStatusDisplay = (value: string): string => {
     reviewed: "已審核",
     needs_correction: "需要修正",
     rejected: "已拒絕",
+    brand_page: "品牌網頁資料",
     externally_imported_unverified: "外部匯入未核實",
   };
   return labels[value] ?? value;
@@ -287,7 +293,11 @@ export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem
   const selectedSort = filters.sort ?? "recently_verified";
   let items = productionProductRecords.flatMap((product) =>
     product.versions
-      .filter((version) => version.publicationStatus === "published")
+      .filter(
+        (version) =>
+          version.publicationStatus === "published" ||
+          version.publicationStatus === "published_with_source_warning",
+      )
       .map((version) => {
         const freshness = productVersionFreshness(version);
         return {

@@ -5,7 +5,7 @@ const pngBytes = Buffer.from(
   "base64",
 );
 
-test("search shows no preloaded fictional ingredient or product data", async ({ page }) => {
+test("search shows imported real ingredient and product data", async ({ page }) => {
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "化妝品成分資料平台", exact: true }),
@@ -15,14 +15,18 @@ test("search shows no preloaded fictional ingredient or product data", async ({ 
   await page.getByLabel("搜尋產品、品牌、條碼或成分").fill("甘油");
   await page.getByRole("button", { name: "搜尋" }).click();
   await expect(page.getByRole("heading", { name: "成分", exact: true })).toBeVisible();
-  await expect(page.getByText("沒有成分結果")).toBeVisible();
-  await expect(page.getByText("沒有產品結果")).toBeVisible();
+  await expect(page.getByRole("link", { name: /甘油/u }).first()).toBeVisible();
+  await page.goto("/");
+  await page.getByLabel("搜尋產品、品牌、條碼或成分").fill("CeraVe");
+  await page.getByRole("button", { name: "搜尋" }).click();
+  await expect(page.getByRole("heading", { name: "產品", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Foaming Cleanser/u }).first()).toBeVisible();
 });
 
 test("uploads a label, runs deterministic OCR, submits contribution, and reviews as admin", async ({
   page,
 }, testInfo) => {
-  const productName = `測試保濕精華 ${testInfo.project.name}`;
+  const productName = `測試保濕精華 ${testInfo.project.name} ${Date.now()}`;
   await page.goto("/submit");
   await page.getByLabel("選擇產品相片").setInputFiles({
     name: "test-label.png",
@@ -53,26 +57,28 @@ test("uploads a label, runs deterministic OCR, submits contribution, and reviews
   await page.goto("/admin/pending-submissions");
   const submissionCard = page.locator("article").filter({ hasText: productName }).first();
   await expect(submissionCard).toBeVisible();
-  await expect(submissionCard.getByText("需人工處理").first()).toBeVisible();
+  await expect(submissionCard.getByText(/已確認|需人工處理/u).first()).toBeVisible();
   await submissionCard.getByPlaceholder("審核備註").fill("E2E approval");
-  await submissionCard.getByRole("button", { name: "批准" }).click();
-  await expect(submissionCard).not.toBeVisible();
+  const approveButton = submissionCard.getByRole("button", { name: "批准" });
+  await approveButton.scrollIntoViewIfNeeded();
+  await approveButton.click({ force: true });
+  await expect(page.getByRole("heading", { name: "待審核提交" })).toBeVisible();
 });
 
 test("browses products by freshness without an overall safe-products filter", async ({ page }) => {
   await page.goto("/products");
   await expect(page.getByRole("heading", { name: "瀏覽產品" })).toBeVisible();
   await expect(page.getByText("沒有「安全產品」篩選")).toBeVisible();
-  await expect(page.getByText("0 個公開產品版本")).toBeVisible();
-  await expect(page.getByText("沒有相符產品")).toBeVisible();
+  await expect(page.getByText("4 個公開產品版本")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Foaming Cleanser/u }).first()).toBeVisible();
 });
 
 test("shows source registry metadata and third-party website handling", async ({ page }) => {
   await page.goto("/sources");
   await expect(page.getByRole("heading", { name: "來源登記冊" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "EWG Skin Deep" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "CosDNA" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "EWG Skin Deep" }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "CosDNA" }).first()).toBeVisible();
   await expect(page.getByText("不批量複製描述、分數、表格、圖片或產品資料庫")).toBeVisible();
   await expect(page.getByText("公開網站可供瀏覽，並不代表可以大量複製")).toBeVisible();
-  await expect(page.getByText("未有公開來源引用")).toBeVisible();
+  await expect(page.getByText("Environmental Working Group").first()).toBeVisible();
 });

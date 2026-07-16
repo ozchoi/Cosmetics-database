@@ -22,16 +22,20 @@ export default async function IngredientPage({
   if (!ingredient) notFound();
 
   const evidence = getIngredientDemoEvidence(ingredient.slug);
+  const regulatoryRules = ingredient.regulatoryRules ?? [];
   const sources = evidence
     .flatMap((item) => item.sourceIds.map(getSource))
+    .concat(regulatoryRules.map((rule) => getSource(rule.sourceId)))
     .filter((source): source is NonNullable<typeof source> => Boolean(source));
+  const humanEvidence = evidence.filter((item) => item.dimension !== "environment");
+  const environmentalEvidence = evidence.filter((item) => item.dimension === "environment");
 
   return (
     <div className="container-shell py-10">
       <SectionHeader
         eyebrow="成分資料"
         title={ingredient.preferredZhHantHkName}
-        body="成分身份、別名、功能、關注維度及來源需要分開記錄。此頁示範資料不包含未經來源支援的安全結論。"
+        body="成分身份、別名、功能、適用條件、證據可信度及來源需要分開記錄。資料不足不會被解讀為零潛在關注。"
       />
 
       <section className="mt-8 rounded-lg border border-[var(--line)] bg-white p-6">
@@ -109,9 +113,26 @@ export default async function IngredientPage({
       </div>
 
       <section className="mt-8 grid gap-4">
-        <RegulatoryNotice>
-          法規狀態會按司法管轄區、用途、產品範圍、濃度及生效日期獨立記錄。此開發種子未加入真實法規限制。
-        </RegulatoryNotice>
+        {regulatoryRules.length > 0 ? (
+          regulatoryRules.map((rule) => (
+            <RegulatoryNotice key={rule.id}>
+              {rule.jurisdiction} · {rule.status}：{rule.summaryZhHant}
+            </RegulatoryNotice>
+          ))
+        ) : (
+          <RegulatoryNotice>
+            暫未有已核實法規限制資料。法規狀態需按司法管轄區、用途、產品範圍、濃度及生效日期獨立記錄。
+          </RegulatoryNotice>
+        )}
+      </section>
+
+      <section className="mt-8 grid gap-6 lg:grid-cols-2">
+        <EvidenceList title="人體健康" items={humanEvidence} />
+        <EvidenceList
+          title="環境健康"
+          items={environmentalEvidence}
+          emptyText="暫未有足夠已核實的環境資料。這不代表成分對環境沒有影響。"
+        />
       </section>
 
       <section className="mt-8">
@@ -130,5 +151,42 @@ export default async function IngredientPage({
         </div>
       </section>
     </div>
+  );
+}
+
+function EvidenceList({
+  title,
+  items,
+  emptyText = "暫未有足夠已核實資料。這不代表沒有潛在關注。",
+}: Readonly<{
+  title: string;
+  items: ReturnType<typeof getIngredientDemoEvidence>;
+  emptyText?: string;
+}>) {
+  return (
+    <section className="rounded-lg border border-[var(--line)] bg-white p-6">
+      <h2 className="text-xl font-semibold text-slate-950">{title}</h2>
+      {items.length > 0 ? (
+        <ul className="mt-4 grid gap-4">
+          {items.map((item) => (
+            <li key={item.id} className="rounded-md bg-[var(--surface-soft)] p-4 text-sm leading-7">
+              <p className="font-semibold text-slate-950">{item.contextLabelZh ?? item.endpoint}</p>
+              <p className="mt-1 text-[var(--muted)]">{item.summaryZhHant}</p>
+              <p className="mt-2 text-xs text-[var(--muted)]">
+                濃度：{item.concentration ?? "資料不足"} · 暴露途徑：{item.route ?? "未指定"} ·
+                證據可信度：{item.evidenceGrade}
+              </p>
+              {item.limitationsZhHant ? (
+                <p className="mt-2 text-xs text-[var(--muted)]">限制：{item.limitationsZhHant}</p>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 rounded-md bg-[var(--surface-soft)] p-4 text-sm leading-7 text-[var(--muted)]">
+          {emptyText}
+        </p>
+      )}
+    </section>
   );
 }

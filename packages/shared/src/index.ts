@@ -1,3 +1,12 @@
+import {
+  seedCoverageRecords,
+  seedEvidenceSummaries,
+  seedIngredientRecords,
+  seedProductRecords,
+  seedReviewIssueRecords,
+  seedSourceRecords,
+} from "./imported-seed-data";
+
 export const appConfig = {
   productName: process.env["APP_NAME"] ?? "化妝品成分資料平台",
   productEnglishName: process.env["APP_ENGLISH_NAME"] ?? "Cosmetic Ingredient Database",
@@ -17,18 +26,21 @@ export type IngredientType =
   | "fragrance_mixture"
   | "colourant"
   | "mineral"
+  | "stereochemical_family"
+  | "material_family"
   | "unknown";
 
 export type UsageType = "leave_on" | "rinse_off" | "mixed" | "unknown";
 
 export type ProductForm =
-  "cream" | "liquid" | "gel" | "powder" | "spray" | "aerosol" | "stick" | "unknown";
+  "cream" | "liquid" | "gel" | "powder" | "spray" | "aerosol" | "stick" | "serum" | "unknown";
 
 export type VerificationStatus =
   | "pending_review"
   | "reviewed"
   | "needs_correction"
   | "rejected"
+  | "brand_page"
   | "externally_imported_unverified";
 
 export type SourceAccessClass =
@@ -103,6 +115,58 @@ export interface IngredientRecord {
   descriptionZhHant: string;
   reviewStatus: "reviewed" | "draft";
   lastReviewedAt?: string;
+  evidenceClaims?: EvidenceClaimRecord[];
+  regulatoryRules?: RegulatoryRuleRecord[];
+  identityNotes?: string;
+  translationStatus?: string;
+}
+
+export interface EvidenceClaimRecord {
+  id: string;
+  domain: string;
+  endpoint: string;
+  conclusionCode: string;
+  contextLabelZh?: string;
+  summaryZhHant: string;
+  concentrationMin?: string;
+  concentrationMax?: string;
+  concentrationUnit?: string;
+  concentrationBasis?: string;
+  usageType?: string;
+  productForm?: string;
+  route?: string;
+  population?: string;
+  ageMin?: string;
+  ageMax?: string;
+  aggregationContext?: string;
+  evidenceKind: string;
+  evidenceGrade: EvidenceGrade;
+  claimStatus: string;
+  sourceIds: string[];
+  sourceVersion?: string;
+  publicationDate?: string;
+  exactLocator?: string;
+  limitationsZhHant?: string;
+}
+
+export interface RegulatoryRuleRecord {
+  id: string;
+  jurisdiction: string;
+  ruleType: string;
+  status: string;
+  productScope?: string;
+  usageType?: string;
+  concentrationMin?: string;
+  concentrationMax?: string;
+  concentrationUnit?: string;
+  requiredWarningText?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  sourceId: string;
+  exactLocator?: string;
+  summaryZhHant: string;
+  reviewStatus: string;
+  notes?: string;
 }
 
 export interface SourceRecord {
@@ -169,9 +233,14 @@ export interface DataSourcePolicyRecord {
 export interface ProductIngredientRecord {
   position: number;
   rawLabelToken: string;
+  normalisedToken?: string;
   ingredientSlug?: string;
   matchStatus: "confirmed" | "uncertain" | "unresolved";
+  rawMatchStatus?: string;
+  matchMethod?: string;
   matchConfidence: number;
+  sourceId?: string;
+  notes?: string;
 }
 
 export interface ProductVersionRecord {
@@ -191,13 +260,19 @@ export interface ProductVersionRecord {
   marketSpecificEvidenceCount?: number;
   formulaHash: string;
   verificationStatus: VerificationStatus;
-  publicationStatus: "draft" | "published" | "review_required";
+  publicationStatus: "draft" | "published" | "review_required" | "published_with_source_warning";
   submittedAt?: string;
   evidenceConfidence: EvidenceGrade;
   dataCompleteness: number;
   concernDimensionValues: Partial<Record<ConcernDimension, number>>;
   ingredients: ProductIngredientRecord[];
   sourceIds: string[];
+  sourceWarningZh?: string;
+  sourceUrl?: string;
+  sourceAccessedAt?: string;
+  packagePhotoVerified?: boolean;
+  rawVerificationStatus?: string;
+  sourcePublisher?: string;
 }
 
 export interface ProductRecord {
@@ -218,15 +293,60 @@ export interface EvidenceSummaryRecord {
   evidenceGrade: EvidenceGrade;
   dataCompleteness: number;
   sourceIds: string[];
+  endpoint?: string;
+  conclusionCode?: string;
+  contextLabelZh?: string;
+  concentration?: string;
+  usageType?: string;
+  productForm?: string;
+  route?: string;
+  population?: string;
+  limitationsZhHant?: string;
+  claimStatus?: string;
+  exactLocator?: string;
+  sourceVersion?: string;
+  publicationDate?: string;
 }
 
-export const productionIngredientRecords: IngredientRecord[] = [];
+export interface CoverageMatrixRecord {
+  ingredient_id: string;
+  canonical_inci: string;
+  Reviewed_Count?: string;
+  Pending_Count?: string;
+  notes?: string;
+  [sourceKey: string]: string | undefined;
+}
 
-export const productionSourceRecords: SourceRecord[] = [];
+export interface ReviewIssueRecord {
+  id: string;
+  priority: string;
+  entityType: string;
+  entityId: string;
+  issueCategory: string;
+  issueZh: string;
+  impactZh: string;
+  recommendedActionZh: string;
+  sourceOrContext?: string;
+  status: string;
+}
 
-export const productionProductRecords: ProductRecord[] = [];
+export const productionIngredientRecords: IngredientRecord[] =
+  seedIngredientRecords as unknown as IngredientRecord[];
 
-export const productionEvidenceSummaries: EvidenceSummaryRecord[] = [];
+export const productionSourceRecords: SourceRecord[] =
+  seedSourceRecords as unknown as SourceRecord[];
+
+export const productionProductRecords: ProductRecord[] =
+  seedProductRecords as unknown as ProductRecord[];
+
+export const productionEvidenceSummaries: EvidenceSummaryRecord[] =
+  seedEvidenceSummaries as unknown as EvidenceSummaryRecord[];
+
+export const productionCoverageRecords: CoverageMatrixRecord[] =
+  seedCoverageRecords as unknown as CoverageMatrixRecord[];
+
+export const productionReviewIssueRecords: ReviewIssueRecord[] =
+  seedReviewIssueRecords as unknown as ReviewIssueRecord[];
 
 export const dataSourcePolicyRecords: DataSourcePolicyRecord[] = [
   {

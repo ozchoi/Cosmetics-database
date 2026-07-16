@@ -30,6 +30,7 @@ enum ProductForm {
   spray
   aerosol
   stick
+  serum
   unknown
 }
 
@@ -38,6 +39,7 @@ enum VerificationStatus {
   reviewed
   needs_correction
   rejected
+  brand_page
   externally_imported_unverified
 }
 
@@ -46,6 +48,7 @@ enum PublicationStatus {
   published
   archived
   review_required
+  published_with_source_warning
 }
 
 enum SubmissionStatus {
@@ -92,6 +95,8 @@ enum IngredientType {
   fragrance_mixture
   colourant
   mineral
+  stereochemical_family
+  material_family
   unknown
 }
 
@@ -122,6 +127,7 @@ enum MatchMethod {
   normalised_alias
   fuzzy_candidate
   manual_resolution
+  unresolved_seed_scope
 }
 
 enum MatchStatus {
@@ -286,6 +292,7 @@ model Session {
 
 model Brand {
   id            String       @id @default(uuid()) @db.Uuid
+  externalSeedId String?     @unique @map("external_seed_id")
   preferredName String       @map("preferred_name")
   slug          String       @unique
   createdAt     DateTime     @default(now()) @map("created_at")
@@ -310,6 +317,7 @@ model BrandAlias {
 
 model Product {
   id                 String           @id @default(uuid()) @db.Uuid
+  externalSeedId     String?          @unique @map("external_seed_id")
   brandId            String           @map("brand_id") @db.Uuid
   preferredName      String           @map("preferred_name")
   slug               String           @unique
@@ -335,6 +343,7 @@ model Category {
 
 model ProductVersion {
   id                  String                      @id @default(uuid()) @db.Uuid
+  externalSeedId       String?                     @unique @map("external_seed_id")
   productId           String                      @map("product_id") @db.Uuid
   marketCode          String                      @map("market_code")
   barcode             String?
@@ -489,6 +498,7 @@ model IngredientListObservation {
 
 model Ingredient {
   id                         String                       @id @default(uuid()) @db.Uuid
+  externalSeedId             String?                      @unique @map("external_seed_id")
   canonicalInciName          String                       @map("canonical_inci_name")
   preferredEnglishName       String                       @map("preferred_english_name")
   preferredZhHantHkName      String                       @map("preferred_zh_hant_hk_name")
@@ -512,6 +522,7 @@ model Ingredient {
 
 model IngredientName {
   id             String       @id @default(uuid()) @db.Uuid
+  externalSeedId String?      @unique @map("external_seed_id")
   ingredientId   String       @map("ingredient_id") @db.Uuid
   name           String
   normalisedName String       @map("normalised_name")
@@ -553,6 +564,7 @@ model IngredientFunctionMapping {
 
 model ChemicalSubstance {
   id                  String                       @id @default(uuid()) @db.Uuid
+  externalSeedId      String?                      @unique @map("external_seed_id")
   preferredName       String                       @map("preferred_name")
   casNumber           String?                      @map("cas_number")
   ecNumber            String?                      @map("ec_number")
@@ -573,6 +585,7 @@ model ChemicalSubstance {
 
 model IngredientSubstanceMapping {
   id                 String            @id @default(uuid()) @db.Uuid
+  externalSeedId     String?           @unique @map("external_seed_id")
   ingredientId       String            @map("ingredient_id") @db.Uuid
   substanceId        String            @map("substance_id") @db.Uuid
   relationshipType   String            @map("relationship_type")
@@ -590,6 +603,7 @@ model IngredientSubstanceMapping {
 
 model ProductIngredient {
   id                          String                    @id @default(uuid()) @db.Uuid
+  externalSeedId              String?                   @unique @map("external_seed_id")
   productVersionId            String                    @map("product_version_id") @db.Uuid
   ingredientListObservationId String?                   @map("ingredient_list_observation_id") @db.Uuid
   position                    Int
@@ -617,6 +631,7 @@ model ProductIngredient {
 
 model Source {
   id                     String                 @id @default(uuid()) @db.Uuid
+  externalSeedId         String?                @unique @map("external_seed_id")
   publisher              String
   title                  String
   sourceType             SourceType             @map("source_type")
@@ -650,6 +665,7 @@ model Source {
 
 model EvidenceClaim {
   id                         String                 @id @default(uuid()) @db.Uuid
+  externalSeedId             String?                @unique @map("external_seed_id")
   ingredientId               String?                @map("ingredient_id") @db.Uuid
   substanceId                String?                @map("substance_id") @db.Uuid
   claimType                  String                 @map("claim_type")
@@ -696,6 +712,7 @@ model ClaimSource {
 
 model RegulatoryRule {
   id                  String             @id @default(uuid()) @db.Uuid
+  externalSeedId      String?            @unique @map("external_seed_id")
   ingredientId        String?            @map("ingredient_id") @db.Uuid
   substanceId         String?            @map("substance_id") @db.Uuid
   jurisdiction        String
@@ -1004,4 +1021,73 @@ model EvidenceReviewDecision {
 
   @@index([evidenceCandidateId])
   @@map("evidence_review_decisions")
+}
+
+model ImportIssue {
+  id                String    @id @default(uuid()) @db.Uuid
+  importJobId        String?   @map("import_job_id") @db.Uuid
+  externalSeedId     String?   @map("external_seed_id")
+  sourceFile         String    @map("source_file")
+  recordId           String?   @map("record_id")
+  category           String
+  severity           String
+  originalValue      String?   @map("original_value")
+  transformedValue   String?   @map("transformed_value")
+  message            String
+  recommendedAction  String?   @map("recommended_action")
+  status             String    @default("open")
+  reviewedBy         String?   @map("reviewed_by") @db.Uuid
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  @@index([importJobId])
+  @@index([severity])
+  @@index([status])
+  @@map("import_issues")
+}
+
+model ReviewQueueItem {
+  id                String    @id @default(uuid()) @db.Uuid
+  externalSeedId     String?   @unique @map("external_seed_id")
+  entityType         String    @map("entity_type")
+  entityId           String?   @map("entity_id")
+  issueCategory      String    @map("issue_category")
+  priority           String
+  originalValueJson  Json?     @map("original_value_json")
+  normalisedValueJson Json?    @map("normalised_value_json")
+  proposedMatchJson  Json?     @map("proposed_match_json")
+  sourceId           String?   @map("source_id")
+  issueZh            String    @map("issue_zh")
+  impactZh           String?   @map("impact_zh")
+  recommendedActionZh String?  @map("recommended_action_zh")
+  reviewerDecision   String?   @map("reviewer_decision")
+  status             String    @default("open")
+  reviewedBy         String?   @map("reviewed_by") @db.Uuid
+  reviewedAt         DateTime? @map("reviewed_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([entityType])
+  @@index([issueCategory])
+  @@index([priority])
+  @@index([status])
+  @@map("review_queue_items")
+}
+
+model CoverageMatrixRecord {
+  id               String   @id @default(uuid()) @db.Uuid
+  externalSeedId    String   @unique @map("external_seed_id")
+  ingredientId      String?  @map("ingredient_id") @db.Uuid
+  canonicalInci     String   @map("canonical_inci")
+  coverageJson      Json     @map("coverage_json")
+  reviewedCount     Int      @default(0) @map("reviewed_count")
+  pendingCount      Int      @default(0) @map("pending_count")
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([ingredientId])
+  @@index([reviewedCount])
+  @@index([pendingCount])
+  @@map("coverage_matrix_records")
 }

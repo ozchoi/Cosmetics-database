@@ -17,13 +17,21 @@
     "db:enrich:comptox": "tsx src/cli/comptox.ts",
     "db:validate:sources": "tsx src/cli/validate-sources.ts",
     "db:rebuild-search": "tsx src/cli/rebuild-search.ts",
+    "data:validate": "tsx src/cli/seed-bundle.ts validate",
+    "data:import": "tsx src/cli/seed-bundle.ts import",
+    "data:import:sources": "tsx src/cli/seed-bundle.ts sources",
+    "data:import:ingredients": "tsx src/cli/seed-bundle.ts ingredients",
+    "data:import:evidence": "tsx src/cli/seed-bundle.ts evidence",
+    "data:import:products": "tsx src/cli/seed-bundle.ts products",
+    "data:report": "tsx src/cli/seed-bundle.ts report",
     "import:status": "tsx src/cli/import-status.ts",
     "db:studio": "prisma studio --schema prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "7.8.0",
     "@cosmetic-lens/importers": "workspace:*",
-    "@cosmetic-lens/shared": "workspace:*"
+    "@cosmetic-lens/shared": "workspace:*",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "prisma": "7.8.0",
