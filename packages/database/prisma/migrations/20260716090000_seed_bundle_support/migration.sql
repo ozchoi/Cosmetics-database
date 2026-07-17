@@ -12,6 +12,11 @@ ALTER TABLE "products" ADD COLUMN IF NOT EXISTS "external_seed_id" TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS "products_external_seed_id_key" ON "products"("external_seed_id");
 
 ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "external_seed_id" TEXT;
+ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "source_ids_json" JSONB;
+ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "source_warning_zh" TEXT;
+ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "source_url" TEXT;
+ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "source_accessed_at" TIMESTAMP(3);
+ALTER TABLE "product_versions" ADD COLUMN IF NOT EXISTS "package_photo_verified" BOOLEAN NOT NULL DEFAULT false;
 CREATE UNIQUE INDEX IF NOT EXISTS "product_versions_external_seed_id_key" ON "product_versions"("external_seed_id");
 
 ALTER TABLE "ingredients" ADD COLUMN IF NOT EXISTS "external_seed_id" TEXT;

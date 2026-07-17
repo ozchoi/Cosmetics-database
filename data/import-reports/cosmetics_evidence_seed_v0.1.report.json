@@ -1,9 +1,9 @@
 {
   "importerVersion": "cosmetics-evidence-seed-v0.1-importer-v1",
-  "bundlePath": "/Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1",
+  "bundlePath": "/tmp/cosmetics_evidence_seed_v0_1_zip",
   "checksumValid": true,
-  "dryRun": false,
-  "databaseWriteAttempted": false,
+  "dryRun": true,
+  "databaseWriteAttempted": true,
   "counts": {
     "sources": 45,
     "ingredients": 25,
@@ -17,7 +17,7 @@
     "conflictGapRows": 15,
     "reviewIssues": 19
   },
-  "insertCount": 394,
+  "insertCount": 0,
   "updateCount": 0,
   "skipCount": 0,
   "rejectCount": 0,

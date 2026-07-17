@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { searchIngredients, searchProducts } from "../../lib/data";
+import { searchIngredients, searchProducts, searchProductsFor } from "../../lib/data";
+import { tryListDatabaseProducts } from "../../lib/db-data";
 import {
   EmptyDataState,
   IngredientName,
@@ -21,7 +22,12 @@ export default async function SearchPage({
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const ingredientResults = query ? searchIngredients(query) : [];
-  const productResults = query ? searchProducts(query) : [];
+  const productRecords = await tryListDatabaseProducts();
+  const productResults = query
+    ? productRecords
+      ? searchProductsFor(query, productRecords)
+      : searchProducts(query)
+    : [];
 
   return (
     <div className="container-shell py-10">

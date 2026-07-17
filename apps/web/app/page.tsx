@@ -1,9 +1,13 @@
 import Link from "next/link";
 import { ArrowRight, Camera, Database, FlaskConical, Search, ShieldCheck } from "lucide-react";
 import { appConfig } from "@cosmetic-lens/shared";
+import { latestReviewedProductsFor, latestReviewedProducts } from "../lib/data";
+import { tryListDatabaseProducts } from "../lib/db-data";
 import { buttonClass, InlineLink, RegulatoryNotice, SectionHeader } from "../components/ui";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const dbProducts = await tryListDatabaseProducts();
+  const products = dbProducts ? latestReviewedProductsFor(dbProducts) : latestReviewedProducts();
   return (
     <div>
       <section className="border-b border-[var(--line)] bg-white">
@@ -88,8 +92,8 @@ export default function HomePage() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <SectionHeader
               eyebrow="真實資料狀態"
-              title="等待已審核真實產品資料"
-              body="產品資料只會來自已批准可重用來源、用戶同意提交的包裝觀察，或 reviewer 連結真實來源後建立的記錄。系統不再載入虛構產品或示範評分。"
+              title="已接入真實產品資料"
+              body="產品資料只會來自已批准可重用來源、用戶同意提交的包裝觀察，或 reviewer 連結真實來源後建立的記錄。品牌網頁資料會清楚標示尚未與實物包裝逐字核實。"
             />
             <Link
               className="font-semibold text-[var(--accent-strong)] underline underline-offset-4"
@@ -98,10 +102,23 @@ export default function HomePage() {
               瀏覽產品資料庫
             </Link>
           </div>
-          <div className="mt-8 rounded-lg border border-dashed border-[var(--line)] bg-[var(--surface-soft)] p-6 text-sm leading-7 text-[var(--muted)]">
-            目前沒有預載 consumer-facing
-            產品。請使用上載流程提交真實包裝觀察，或由管理員完成來源審核後再匯入 Open Beauty Facts
-            staging records。
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
+            {products.slice(0, 4).map((product) => (
+              <Link
+                key={product.id}
+                href={`/products/${product.slug}`}
+                className="rounded-lg border border-[var(--line)] bg-[var(--surface-soft)] p-5 hover:border-[var(--accent)]"
+              >
+                <p className="text-sm text-[var(--muted)]">{product.brand}</p>
+                <h3 className="mt-1 font-semibold text-slate-950">{product.preferredName}</h3>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {product.versions[0]?.marketCode ?? "市場未指定"} ·{" "}
+                  {product.versions[0]?.verificationStatus === "brand_page"
+                    ? "品牌網頁資料"
+                    : "核實狀態未指定"}
+                </p>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

@@ -109,7 +109,13 @@ export const searchIngredients = (query: string): SearchResult<IngredientRecord>
     );
 
 export const searchProducts = (query: string): SearchResult<ProductRecord>[] =>
-  productionProductRecords
+  searchProductsFor(query, productionProductRecords);
+
+export const searchProductsFor = (
+  query: string,
+  products: ProductRecord[],
+): SearchResult<ProductRecord>[] =>
+  products
     .map((product) => {
       const rank = rankTerms(query, productSearchTerms(product));
       return rank ? { item: product, ...rank } : undefined;
@@ -121,7 +127,10 @@ export const searchProducts = (query: string): SearchResult<ProductRecord>[] =>
     );
 
 export const latestReviewedProducts = (): ProductRecord[] =>
-  productionProductRecords
+  latestReviewedProductsFor(productionProductRecords);
+
+export const latestReviewedProductsFor = (products: ProductRecord[]): ProductRecord[] =>
+  products
     .filter((product) =>
       product.versions.some(
         (version) =>
@@ -271,14 +280,18 @@ export const productVersionFreshness = (
 };
 
 export const productBrowseOptions = () => {
-  const versions = productionProductRecords.flatMap((product) =>
+  return productBrowseOptionsFor(productionProductRecords);
+};
+
+export const productBrowseOptionsFor = (products: ProductRecord[]) => {
+  const versions = products.flatMap((product) =>
     product.versions.map((version) => ({ product, version })),
   );
   const unique = (values: string[]) =>
     [...new Set(values.filter(Boolean))].sort((left, right) => left.localeCompare(right));
   return {
     categories: unique(versions.map(({ version }) => version.category)),
-    brands: unique(productionProductRecords.map((product) => product.brand)),
+    brands: unique(products.map((product) => product.brand)),
     usageTypes: unique(versions.map(({ version }) => version.usageType)),
     productForms: unique(versions.map(({ version }) => version.productForm)),
     bodyAreas: unique(versions.flatMap(({ version }) => version.bodyArea)),
@@ -290,8 +303,15 @@ export const productBrowseOptions = () => {
 };
 
 export const browseProducts = (filters: ProductBrowseFilters): ProductBrowseItem[] => {
+  return browseProductsFor(filters, productionProductRecords);
+};
+
+export const browseProductsFor = (
+  filters: ProductBrowseFilters,
+  products: ProductRecord[],
+): ProductBrowseItem[] => {
   const selectedSort = filters.sort ?? "recently_verified";
-  let items = productionProductRecords.flatMap((product) =>
+  let items = products.flatMap((product) =>
     product.versions
       .filter(
         (version) =>

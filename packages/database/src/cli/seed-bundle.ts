@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import {
   createImportReport,
   defaultBundlePath,
+  importSeedBundleToDatabase,
   writeReport,
   writeSharedSnapshot,
 } from "../seed-bundle";
@@ -53,20 +54,14 @@ if (
 const report =
   shouldWriteSnapshot && !dryRun
     ? writeSharedSnapshot(bundlePath, snapshotPath)
-    : createImportReport(bundlePath, dryRun, false);
+    : await importSeedBundleToDatabase(bundlePath, { dryRun });
 
 writeReport(report, reportPath);
 printReport(report);
 
-if (!dryRun && !shouldWriteSnapshot) {
-  console.log(
-    "No database write was attempted because this project needs DATABASE_URL and Prisma wiring for production import. Use --write-snapshot to refresh the current static public data snapshot.",
-  );
-}
-
 process.exit(report.rejectCount > 0 ? 1 : 0);
 
-function printReport(report: ReturnType<typeof createImportReport>) {
+function printReport(report: Awaited<ReturnType<typeof importSeedBundleToDatabase>>) {
   console.log(JSON.stringify(report, null, 2));
 }
 

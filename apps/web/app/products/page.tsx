@@ -2,13 +2,16 @@ import Link from "next/link";
 import { ArrowUpDown, Filter } from "lucide-react";
 import {
   browseProducts,
+  browseProductsFor,
   productFormDisplay,
   productBrowseOptions,
+  productBrowseOptionsFor,
   usageTypeDisplay,
   verificationStatusDisplay,
   type DataFreshnessStatus,
   type ProductBrowseFilters,
 } from "../../lib/data";
+import { tryListDatabaseProducts } from "../../lib/db-data";
 import {
   DataCompletenessIndicator,
   DataFreshnessBadge,
@@ -59,8 +62,11 @@ export default async function ProductsPage({
     ...(concernDimension ? { concernDimension: concernDimension as ConcernDimension } : {}),
     ...(sort ? { sort } : {}),
   };
-  const options = productBrowseOptions();
-  const products = browseProducts(filters);
+  const productRecords = (await tryListDatabaseProducts()) ?? undefined;
+  const options = productRecords ? productBrowseOptionsFor(productRecords) : productBrowseOptions();
+  const products = productRecords
+    ? browseProductsFor(filters, productRecords)
+    : browseProducts(filters);
 
   return (
     <div className="container-shell py-10">

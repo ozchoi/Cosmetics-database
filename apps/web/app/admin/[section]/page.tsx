@@ -18,6 +18,7 @@ import {
   productionSourceRecords,
 } from "@cosmetic-lens/shared";
 import { matchIngredientList } from "@cosmetic-lens/ingredient-parser";
+import { tryListDatabaseProducts } from "../../../lib/db-data";
 
 const sectionLabels: Record<string, string> = {
   "pending-submissions": "待審核提交",
@@ -416,14 +417,15 @@ function IngredientsAdmin({ label }: Readonly<{ label: string }>) {
   );
 }
 
-function ProductsAdmin({ label }: Readonly<{ label: string }>) {
+async function ProductsAdmin({ label }: Readonly<{ label: string }>) {
+  const products = (await tryListDatabaseProducts()) ?? productionProductRecords;
   return (
     <AdminShell
       label={label}
       body="產品及版本以 formula hash、market、barcode、觀察日期及審核狀態區分；舊版本不可覆寫。"
     >
       <div className="grid gap-3">
-        {productionProductRecords.map((product) => (
+        {products.map((product) => (
           <article key={product.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-semibold text-slate-950">{product.preferredName}</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">

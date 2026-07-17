@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 export const seedBundleImporterVersion = "cosmetics-evidence-seed-v0.1-importer-v1";
@@ -40,6 +42,16 @@ export interface SeedBundleReport {
   skipCount: number;
   rejectCount: number;
   issues: ImportIssue[];
+}
+
+export interface DatabaseCounts {
+  brands: number;
+  products: number;
+  productVersions: number;
+  productIngredients: number;
+  sources: number;
+  publishedProductVersions: number;
+  publishedWithSourceWarningProductVersions: number;
 }
 
 const requiredFiles = [
@@ -412,6 +424,88 @@ export const writeSharedSnapshot = (bundlePath: string, outputPath: string): See
   return createImportReport(bundlePath, false, false);
 };
 
+export const importSeedBundleToDatabase = async (
+  bundlePath: string,
+  options: { dryRun?: boolean } = {},
+): Promise<SeedBundleReport & { beforeCounts?: DatabaseCounts; afterCounts?: DatabaseCounts }> => {
+  const report = createImportReport(bundlePath, Boolean(options.dryRun), true);
+  if (report.rejectCount > 0 || options.dryRun) return report;
+
+  const { data, issues } = loadSeedBundle(bundlePath);
+  if (!data) return report;
+
+  const prisma = createPrismaClient();
+  try {
+    const beforeCounts = await getDatabaseCounts(prisma);
+    await prisma.$transaction(
+      async (tx) => {
+        await importSources(tx, data.sources);
+        await importIngredients(tx, data);
+        await importEvidence(tx, data);
+        await importProducts(tx, data);
+        await importReviewData(tx, data, issues);
+      },
+      { timeout: 60_000 },
+    );
+    const afterCounts = await getDatabaseCounts(prisma);
+    return {
+      ...report,
+      databaseWriteAttempted: true,
+      insertCount:
+        afterCounts.brands -
+        beforeCounts.brands +
+        (afterCounts.products - beforeCounts.products) +
+        (afterCounts.productVersions - beforeCounts.productVersions) +
+        (afterCounts.productIngredients - beforeCounts.productIngredients) +
+        (afterCounts.sources - beforeCounts.sources),
+      beforeCounts,
+      afterCounts,
+    };
+  } finally {
+    await prisma.$disconnect();
+  }
+};
+
+export const getDatabaseCounts = async (client?: PrismaClient): Promise<DatabaseCounts> => {
+  const ownsClient = !client;
+  const prisma = client ?? createPrismaClient();
+  try {
+    const [rows] = await prisma.$queryRawUnsafe<
+      Array<{
+        brands: bigint;
+        products: bigint;
+        product_versions: bigint;
+        product_ingredients: bigint;
+        sources: bigint;
+        published_product_versions: bigint;
+        published_with_source_warning_product_versions: bigint;
+      }>
+    >(
+      `select
+        (select count(*) from brands) as brands,
+        (select count(*) from products) as products,
+        (select count(*) from product_versions) as product_versions,
+        (select count(*) from product_ingredients) as product_ingredients,
+        (select count(*) from sources) as sources,
+        (select count(*) from product_versions where publication_status = 'published') as published_product_versions,
+        (select count(*) from product_versions where publication_status = 'published_with_source_warning') as published_with_source_warning_product_versions`,
+    );
+    return {
+      brands: Number(rows?.brands ?? 0),
+      products: Number(rows?.products ?? 0),
+      productVersions: Number(rows?.product_versions ?? 0),
+      productIngredients: Number(rows?.product_ingredients ?? 0),
+      sources: Number(rows?.sources ?? 0),
+      publishedProductVersions: Number(rows?.published_product_versions ?? 0),
+      publishedWithSourceWarningProductVersions: Number(
+        rows?.published_with_source_warning_product_versions ?? 0,
+      ),
+    };
+  } finally {
+    if (ownsClient) await prisma.$disconnect();
+  }
+};
+
 export const renderSharedSnapshot = (data: SeedBundleData, issues: ImportIssue[]): string => {
   const ingredientSlugById = new Map(
     data.ingredients.map((ingredient) => [
@@ -759,6 +853,436 @@ const validateRelationships = (data: SeedBundleData): ImportIssue[] => {
   return issues;
 };
 
+type Tx = Omit<
+  PrismaClient,
+  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+>;
+
+const importSources = async (tx: Tx, sources: SourceSeed[]) => {
+  for (const source of sources) {
+    await tx.$executeRawUnsafe(
+      `insert into sources (
+        external_seed_id, publisher, title, source_type, jurisdiction, publication_date, version,
+        external_url, exact_locator, accessed_at, language_code, licence_status,
+        commercial_reuse_status, attribution_text, review_status, evidence_relationship,
+        evidence_grade, is_demo, created_at, updated_at
+      ) values (
+        $1, $2, $3, $4::"SourceType", $5, $6::timestamp, $7,
+        $8, $9, $10::timestamp, $11, $12, $13, $14, $15::"ReviewStatus",
+        $16::"ClaimSourceRelationship", $17::"EvidenceGrade", false, now(), now()
+      )
+      on conflict (external_seed_id) do update set
+        publisher = excluded.publisher,
+        title = excluded.title,
+        source_type = excluded.source_type,
+        jurisdiction = excluded.jurisdiction,
+        publication_date = excluded.publication_date,
+        version = excluded.version,
+        external_url = excluded.external_url,
+        exact_locator = excluded.exact_locator,
+        accessed_at = excluded.accessed_at,
+        licence_status = excluded.licence_status,
+        commercial_reuse_status = excluded.commercial_reuse_status,
+        attribution_text = excluded.attribution_text,
+        review_status = excluded.review_status,
+        evidence_relationship = excluded.evidence_relationship,
+        updated_at = now()`,
+      source.source_id,
+      source.publisher,
+      source.title,
+      mapSourceType(source.source_type),
+      blankToNull(source.jurisdiction),
+      blankToNull(source.publication_date),
+      blankToNull(source.version),
+      blankToNull(source.external_url),
+      blankToNull(source.exact_locator),
+      blankToNull(source.accessed_at),
+      "zh-Hant-HK",
+      mapLicenceStatus(source.licence_status),
+      mapReuseStatus(source.commercial_reuse_status),
+      blankToNull(source.attribution_text),
+      source.review_status === "reviewed" ? "reviewed" : "draft",
+      mapRelationship(source.primary_or_secondary),
+      "U",
+    );
+  }
+};
+
+const importIngredients = async (tx: Tx, data: SeedBundleData) => {
+  for (const ingredient of data.ingredients) {
+    await tx.$executeRawUnsafe(
+      `insert into ingredients (
+        external_seed_id, canonical_inci_name, preferred_english_name, preferred_zh_hant_hk_name,
+        slug, ingredient_type, description_zh_hant, review_status, created_at, updated_at
+      ) values ($1, $2, $3, $4, $5, $6::"IngredientType", $7, $8::"ReviewStatus", now(), now())
+      on conflict (external_seed_id) do update set
+        canonical_inci_name = excluded.canonical_inci_name,
+        preferred_english_name = excluded.preferred_english_name,
+        preferred_zh_hant_hk_name = excluded.preferred_zh_hant_hk_name,
+        slug = excluded.slug,
+        ingredient_type = excluded.ingredient_type,
+        description_zh_hant = excluded.description_zh_hant,
+        review_status = excluded.review_status,
+        updated_at = now()`,
+      ingredient.ingredient_id,
+      ingredient.canonical_inci,
+      ingredient.preferred_english,
+      ingredient.preferred_zh_hant_hk,
+      slugify(ingredient.canonical_inci),
+      mapIngredientType(ingredient.ingredient_type),
+      ingredient.substance_identity_notes || "資料不足；不應將資料不足解讀為低潛在關注。",
+      ingredient.review_status === "reviewed" ? "reviewed" : "draft",
+    );
+  }
+
+  const ingredientIds = await idMap(tx, "ingredients");
+  for (const alias of data.aliasesSubstances.filter((item) => item.record_type === "alias")) {
+    const ingredientId = ingredientIds.get(alias.ingredient_id);
+    if (!ingredientId) continue;
+    await tx.$executeRawUnsafe(
+      `insert into ingredient_names (
+        external_seed_id, ingredient_id, name, normalised_name, language_code, region_code,
+        name_type, review_status, created_at
+      ) values ($1, $2::uuid, $3, $4, $5, $6, $7::"NameType", $8::"ReviewStatus", now())
+      on conflict (external_seed_id) do update set
+        ingredient_id = excluded.ingredient_id,
+        name = excluded.name,
+        normalised_name = excluded.normalised_name,
+        language_code = excluded.language_code,
+        region_code = excluded.region_code,
+        name_type = excluded.name_type,
+        review_status = excluded.review_status`,
+      alias.record_id,
+      ingredientId,
+      alias.alias_or_substance_name,
+      normaliseForDb(alias.alias_or_substance_name),
+      alias.language_code || "und",
+      blankToNull(alias.region_code),
+      mapNameType(alias.alias_type),
+      alias.mapping_confidence === "reviewed" ? "reviewed" : "draft",
+    );
+  }
+};
+
+const importEvidence = async (tx: Tx, data: SeedBundleData) => {
+  const ingredientIds = await idMap(tx, "ingredients");
+  const sourceIds = await idMap(tx, "sources");
+  for (const claim of data.evidenceClaims) {
+    const ingredientId = ingredientIds.get(claim.ingredient_id);
+    if (!ingredientId) continue;
+    await tx.$executeRawUnsafe(
+      `insert into evidence_claims (
+        external_seed_id, ingredient_id, claim_type, endpoint, effect_direction, summary_zh_hant,
+        structured_value, unit, route, population, concentration_min, concentration_max,
+        applicable_product_types_json, applicable_conditions_json, evidence_grade, status,
+        is_demo, created_at, updated_at
+      ) values (
+        $1, $2::uuid, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11::numeric, $12::numeric,
+        $13::jsonb, $14::jsonb, $15::"EvidenceGrade", $16::"ClaimStatus", false, now(), now()
+      )
+      on conflict (external_seed_id) do update set
+        ingredient_id = excluded.ingredient_id,
+        claim_type = excluded.claim_type,
+        endpoint = excluded.endpoint,
+        effect_direction = excluded.effect_direction,
+        summary_zh_hant = excluded.summary_zh_hant,
+        structured_value = excluded.structured_value,
+        unit = excluded.unit,
+        route = excluded.route,
+        population = excluded.population,
+        concentration_min = excluded.concentration_min,
+        concentration_max = excluded.concentration_max,
+        applicable_product_types_json = excluded.applicable_product_types_json,
+        applicable_conditions_json = excluded.applicable_conditions_json,
+        evidence_grade = excluded.evidence_grade,
+        status = excluded.status,
+        updated_at = now()`,
+      claim.claim_id,
+      ingredientId,
+      claim.domain,
+      claim.endpoint,
+      claim.conclusion_code,
+      claim.summary_zh_hant,
+      JSON.stringify(claim),
+      blankToNull(claim.concentration_unit),
+      blankToNull(claim.route),
+      blankToNull(claim.population),
+      numberOrNull(claim.concentration_min),
+      numberOrNull(claim.concentration_max),
+      JSON.stringify([claim.product_form, claim.usage_type].filter(Boolean)),
+      JSON.stringify({
+        contextLabelZh: claim.context_label_zh,
+        concentrationBasis: claim.concentration_basis,
+        ageMin: claim.age_min,
+        ageMax: claim.age_max,
+        aggregationContext: claim.aggregation_context,
+        limitationsZhHant: claim.limitations_zh_hant,
+      }),
+      mapEvidenceGrade(claim.evidence_grade),
+      claim.claim_status === "active" ? "active" : "draft",
+    );
+    const sourceId = sourceIds.get(claim.source_id);
+    if (sourceId) {
+      const claimId = (await idMap(tx, "evidence_claims")).get(claim.claim_id);
+      if (claimId) {
+        await tx.$executeRawUnsafe(
+          `insert into claim_sources (evidence_claim_id, source_id, relationship_type)
+           values ($1::uuid, $2::uuid, 'primary'::"ClaimSourceRelationship")
+           on conflict do nothing`,
+          claimId,
+          sourceId,
+        );
+      }
+    }
+  }
+
+  for (const rule of data.regulatoryRules) {
+    const ingredientId = rule.ingredient_id ? ingredientIds.get(rule.ingredient_id) : undefined;
+    const sourceId = sourceIds.get(rule.source_id);
+    if (!sourceId) continue;
+    await tx.$executeRawUnsafe(
+      `insert into regulatory_rules (
+        external_seed_id, ingredient_id, jurisdiction, status, product_scope, usage_type,
+        concentration_min, concentration_max, required_warning_text, effective_from, effective_to,
+        summary_zh_hant, source_id, review_status
+      ) values (
+        $1, $2::uuid, $3, $4, $5, $6::"UsageType", $7::numeric, null, null,
+        $8::timestamp, $9::timestamp, $10, $11::uuid, 'reviewed'::"ReviewStatus"
+      )
+      on conflict (external_seed_id) do update set
+        ingredient_id = excluded.ingredient_id,
+        jurisdiction = excluded.jurisdiction,
+        status = excluded.status,
+        product_scope = excluded.product_scope,
+        usage_type = excluded.usage_type,
+        concentration_min = excluded.concentration_min,
+        effective_from = excluded.effective_from,
+        effective_to = excluded.effective_to,
+        summary_zh_hant = excluded.summary_zh_hant,
+        source_id = excluded.source_id,
+        review_status = excluded.review_status`,
+      rule.rule_id,
+      ingredientId ?? null,
+      rule.jurisdiction,
+      rule.status,
+      blankToNull(rule.product_scope),
+      mapUsageType(rule.usage_type),
+      numberOrNull(rule.threshold_min),
+      blankToNull(rule.effective_from),
+      blankToNull(rule.effective_to),
+      rule.summary_zh_hant,
+      sourceId,
+    );
+  }
+};
+
+const importProducts = async (tx: Tx, data: SeedBundleData) => {
+  const ingredientIds = await idMap(tx, "ingredients");
+  for (const product of data.productSeeds) {
+    const brandSeedId = `BRD-${slugify(product.brand)}`;
+    await tx.$executeRawUnsafe(
+      `insert into brands (external_seed_id, preferred_name, slug, created_at, updated_at)
+       values ($1, $2, $3, now(), now())
+       on conflict (external_seed_id) do update set preferred_name = excluded.preferred_name, slug = excluded.slug, updated_at = now()`,
+      brandSeedId,
+      product.brand,
+      slugify(product.brand),
+    );
+  }
+  const brandIds = await idMap(tx, "brands");
+  for (const product of data.productSeeds) {
+    const brandId = brandIds.get(`BRD-${slugify(product.brand)}`);
+    if (!brandId) continue;
+    const productSeedId = stableProductId(product.product_version_id);
+    const productSlug = slugify(`${product.brand}-${product.product_name}-${product.market}`);
+    await tx.$executeRawUnsafe(
+      `insert into products (external_seed_id, brand_id, preferred_name, slug, description_zh_hant, created_at, updated_at)
+       values ($1, $2::uuid, $3, $4, $5, now(), now())
+       on conflict (external_seed_id) do update set
+        brand_id = excluded.brand_id,
+        preferred_name = excluded.preferred_name,
+        slug = excluded.slug,
+        description_zh_hant = excluded.description_zh_hant,
+        updated_at = now()`,
+      productSeedId,
+      brandId,
+      product.product_name,
+      productSlug,
+      product.source_warning_zh,
+    );
+    await tx.$executeRawUnsafe(
+      `insert into categories (code, name_zh_hant)
+       values ($1, $2)
+       on conflict (code) do update set name_zh_hant = excluded.name_zh_hant`,
+      product.category,
+      product.category,
+    );
+  }
+  const productIds = await idMap(tx, "products");
+  const categories = await tx.$queryRawUnsafe<Array<{ id: string; code: string }>>(
+    `select id::text, code from categories`,
+  );
+  const categoryIds = new Map(categories.map((item) => [item.code, item.id]));
+  for (const product of data.productSeeds) {
+    const productId = productIds.get(stableProductId(product.product_version_id));
+    if (!productId) continue;
+    await tx.$executeRawUnsafe(
+      `insert into product_versions (
+        external_seed_id, product_id, market_code, barcode, category_id, product_form, usage_type,
+        body_area, target_user_group, label_observed_at, formula_hash, source_ids_json,
+        source_warning_zh, source_url, source_accessed_at, package_photo_verified,
+        verification_status, publication_status, submitted_at, evidence_confidence,
+        data_completeness, concern_dimension_values_json, created_at, updated_at
+      ) values (
+        $1, $2::uuid, $3, null, $4::uuid, $5::"ProductForm", $6::"UsageType",
+        $7::text[], $8, $9::timestamp, $10, $11::jsonb, $12, $13, $14::timestamp, $15,
+        $16::"VerificationStatus", $17::"PublicationStatus", $18::timestamp, 'U'::"EvidenceGrade",
+        0.35, '{}'::jsonb, now(), now()
+      )
+      on conflict (external_seed_id) do update set
+        product_id = excluded.product_id,
+        market_code = excluded.market_code,
+        category_id = excluded.category_id,
+        product_form = excluded.product_form,
+        usage_type = excluded.usage_type,
+        body_area = excluded.body_area,
+        label_observed_at = excluded.label_observed_at,
+        formula_hash = excluded.formula_hash,
+        source_ids_json = excluded.source_ids_json,
+        source_warning_zh = excluded.source_warning_zh,
+        source_url = excluded.source_url,
+        source_accessed_at = excluded.source_accessed_at,
+        package_photo_verified = excluded.package_photo_verified,
+        verification_status = excluded.verification_status,
+        publication_status = excluded.publication_status,
+        submitted_at = excluded.submitted_at,
+        updated_at = now()`,
+      product.product_version_id,
+      productId,
+      product.market,
+      categoryIds.get(product.category) ?? null,
+      mapProductForm(product.product_form),
+      mapUsageType(product.usage_type),
+      product.body_area.split(/[_;/,\s]+/u).filter(Boolean),
+      "未指定",
+      product.label_observed_at,
+      product.formula_hash,
+      JSON.stringify([product.source_id]),
+      product.source_warning_zh,
+      blankToNull(product.source_url),
+      blankToNull(product.source_accessed_at),
+      product.package_photo_verified.toLowerCase() === "true",
+      "brand_page",
+      "published_with_source_warning",
+      product.label_observed_at,
+    );
+  }
+
+  const versionIds = await idMap(tx, "product_versions");
+  for (const item of data.productIngredients) {
+    const versionId = versionIds.get(item.product_version_id);
+    if (!versionId) continue;
+    await tx.$executeRawUnsafe(
+      `insert into product_ingredients (
+        external_seed_id, product_version_id, position, raw_label_token, normalised_token,
+        ingredient_id, match_method, match_confidence, match_status, is_may_contain,
+        notes
+      ) values (
+        $1, $2::uuid, $3, $4, $5, $6::uuid, $7::"MatchMethod", $8::numeric,
+        $9::"MatchStatus", $10, $11
+      )
+      on conflict (external_seed_id) do update set
+        product_version_id = excluded.product_version_id,
+        position = excluded.position,
+        raw_label_token = excluded.raw_label_token,
+        normalised_token = excluded.normalised_token,
+        ingredient_id = excluded.ingredient_id,
+        match_method = excluded.match_method,
+        match_confidence = excluded.match_confidence,
+        match_status = excluded.match_status,
+        is_may_contain = excluded.is_may_contain,
+        notes = excluded.notes`,
+      `${item.product_version_id}-${item.position}`,
+      versionId,
+      Number(item.position),
+      item.raw_label_token,
+      item.normalized_token,
+      item.ingredient_id ? (ingredientIds.get(item.ingredient_id) ?? null) : null,
+      item.match_method || null,
+      numberOrNull(item.match_confidence) ?? 0,
+      item.match_status === "unresolved_in_seed" ? "unresolved" : "confirmed",
+      item.is_may_contain.toLowerCase() === "true",
+      item.notes,
+    );
+  }
+};
+
+const importReviewData = async (tx: Tx, data: SeedBundleData, importIssues: ImportIssue[]) => {
+  for (const issueItem of importIssues) {
+    await tx.$executeRawUnsafe(
+      `insert into import_issues (
+        external_seed_id, source_file, record_id, category, severity, original_value,
+        message, recommended_action, status, created_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, 'open', now())
+      on conflict do nothing`,
+      `${issueItem.file}-${issueItem.recordId ?? issueItem.category}`,
+      issueItem.file,
+      issueItem.recordId ?? null,
+      issueItem.category,
+      issueItem.severity,
+      issueItem.originalValue ?? null,
+      issueItem.message,
+      issueItem.recommendedAction ?? null,
+    );
+  }
+  for (const gap of data.conflictsGaps) {
+    await tx.$executeRawUnsafe(
+      `insert into review_queue_items (
+        external_seed_id, entity_type, entity_id, issue_category, priority, issue_zh,
+        impact_zh, recommended_action_zh, source_id, status, created_at, updated_at
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), now())
+      on conflict (external_seed_id) do update set
+        priority = excluded.priority,
+        issue_zh = excluded.issue_zh,
+        impact_zh = excluded.impact_zh,
+        recommended_action_zh = excluded.recommended_action_zh,
+        status = excluded.status,
+        updated_at = now()`,
+      gap.gap_id,
+      gap.entity_type,
+      gap.entity_id,
+      gap.issue_category,
+      gap.priority,
+      gap.issue_zh,
+      gap.impact_zh,
+      gap.recommended_action_zh,
+      blankToNull(gap.source_or_context),
+      gap.status,
+    );
+  }
+  for (const row of data.coverageMatrix) {
+    await tx.$executeRawUnsafe(
+      `insert into coverage_matrix_records (
+        external_seed_id, canonical_inci, coverage_json, reviewed_count, pending_count,
+        notes, created_at, updated_at
+      ) values ($1, $2, $3::jsonb, $4, $5, $6, now(), now())
+      on conflict (external_seed_id) do update set
+        canonical_inci = excluded.canonical_inci,
+        coverage_json = excluded.coverage_json,
+        reviewed_count = excluded.reviewed_count,
+        pending_count = excluded.pending_count,
+        notes = excluded.notes,
+        updated_at = now()`,
+      row.ingredient_id,
+      row.canonical_inci,
+      JSON.stringify(row),
+      Number(row.Reviewed_Count || 0),
+      Number(row.Pending_Count || 0),
+      blankToNull(row.notes),
+    );
+  }
+};
+
 export const formulaHash = (normalisedOrderedTokens: string[]): string =>
   sha256(
     Buffer.from(normalisedOrderedTokens.map((token) => token.trim().toLowerCase()).join("\n")),
@@ -842,6 +1366,26 @@ const groupBy = <T>(items: T[], key: (item: T) => string): Map<string, T[]> => {
   for (const item of items) grouped.set(key(item), [...(grouped.get(key(item)) ?? []), item]);
   return grouped;
 };
+const idMap = async (tx: Tx, table: string): Promise<Map<string, string>> => {
+  const allowedTables = new Set([
+    "brands",
+    "products",
+    "product_versions",
+    "ingredients",
+    "sources",
+    "evidence_claims",
+  ]);
+  if (!allowedTables.has(table)) throw new Error(`Unsupported id map table: ${table}`);
+  const rows = await tx.$queryRawUnsafe<Array<{ id: string; external_seed_id: string }>>(
+    `select id::text, external_seed_id from ${table} where external_seed_id is not null`,
+  );
+  return new Map(rows.map((row) => [row.external_seed_id, row.id]));
+};
+const normaliseForDb = (value: string): string => value.trim().toLowerCase();
+const blankToNull = (value: string | undefined): string | null =>
+  value && value.trim() ? value : null;
+const numberOrNull = (value: string | undefined): number | null =>
+  value && value.trim() ? Number(value) : null;
 
 const mapIngredientType = (value: string) =>
   [
@@ -954,6 +1498,12 @@ const mapRuleForSnapshot = (rule: RegulatoryRuleSeed) => ({
 });
 
 export const defaultBundlePath = "/Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1";
+const defaultDatabaseUrl =
+  "postgresql://cosmetics:cosmetics@localhost:5432/cosmetics_lens?schema=public";
+const createPrismaClient = () =>
+  new PrismaClient({
+    adapter: new PrismaPg({ connectionString: process.env["DATABASE_URL"] ?? defaultDatabaseUrl }),
+  });
 export const defaultReportPath = relative(
   process.cwd(),
   join(process.cwd(), "data", "import-reports", "cosmetics_evidence_seed_v0.1.report.json"),

@@ -57,6 +57,7 @@ EWG Skin Deep, CosDNA, Open Beauty Facts, and similar sites are treated only as 
 - `pnpm db:bootstrap`
 - `pnpm data:validate -- --path /Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1`
 - `pnpm data:import -- --path /Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1 --dry-run`
+- `DATABASE_URL="postgresql://..." pnpm data:import -- --path /Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1`
 - `pnpm data:import -- --path /Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1 --write-snapshot`
 - `pnpm data:report -- --path /Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1`
 - `pnpm import:open-beauty-facts -- --limit 250 --require-ingredients --dry-run`
@@ -94,6 +95,6 @@ Users can analyse without storing an original photo. If they opt into contributi
 
 The production-facing database is real-data only. Bootstrap scripts do not insert fictional products, brands, evidence claims, regulatory limits, placeholder scores, or demo ratings. Consumer-facing records must come from approved reusable sources, real package-label observations, user submissions retained with consent, reviewer-entered source-backed records, or approved official chemical identity APIs.
 
-The current seed evidence pack is validated by checksum and runtime schemas, then rendered to `packages/shared/src/imported-seed-data.ts` for the public MVP. A production database import must run against `DATABASE_URL` after migrations are applied; the original ZIP/folder is not required at runtime and must not be exposed under `public/`.
+The current seed evidence pack is validated by checksum and runtime schemas. `pnpm data:import` writes to the configured PostgreSQL database using stable external seed IDs; `--write-snapshot` only refreshes `packages/shared/src/imported-seed-data.ts` as a build-safe fallback. A production database import must run manually against the same `DATABASE_URL` used by the deployed app after migrations are applied; the original ZIP/folder is not required at runtime and must not be exposed under `public/`.
 
 Test fixtures use clearly synthetic records inside test files only and are not loaded by normal database setup.

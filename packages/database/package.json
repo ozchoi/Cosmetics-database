@@ -31,6 +31,8 @@
     "@prisma/client": "7.8.0",
     "@cosmetic-lens/importers": "workspace:*",
     "@cosmetic-lens/shared": "workspace:*",
+    "@prisma/adapter-pg": "7.8.0",
+    "pg": "8.16.3",
     "zod": "4.4.3"
   },
   "devDependencies": {

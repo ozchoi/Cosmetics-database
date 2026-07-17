@@ -10,6 +10,7 @@ import {
   productVersionFreshness,
   usageTypeDisplay,
 } from "../../../lib/data";
+import { tryListDatabaseProducts } from "../../../lib/db-data";
 import {
   ConcernRangeCard,
   DataCompletenessIndicator,
@@ -27,7 +28,8 @@ export default async function ProductPage({
   searchParams,
 }: Readonly<{ params: Promise<{ slug: string }>; searchParams: Promise<{ version?: string }> }>) {
   const [{ slug }, query] = await Promise.all([params, searchParams]);
-  const product = getProduct(slug);
+  const dbProducts = await tryListDatabaseProducts();
+  const product = dbProducts?.find((item) => item.slug === slug) ?? getProduct(slug);
   if (!product) notFound();
 
   const selectedVersion =
