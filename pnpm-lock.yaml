@@ -35,6 +35,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@cosmetic-lens/database':
+        specifier: workspace:*
+        version: link:../../packages/database
       '@cosmetic-lens/ingredient-parser':
         specifier: workspace:*
         version: link:../../packages/ingredient-parser
@@ -50,12 +53,6 @@ importers:
       '@cosmetic-lens/storage':
         specifier: workspace:*
         version: link:../../packages/storage
-      '@prisma/adapter-pg':
-        specifier: 7.8.0
-        version: 7.8.0
-      '@prisma/client':
-        specifier: 7.8.0
-        version: 7.8.0(prisma@7.8.0(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)(typescript@5.9.3))(typescript@5.9.3)
       '@tailwindcss/postcss':
         specifier: 4.3.2
         version: 4.3.2
@@ -68,9 +65,6 @@ importers:
       next:
         specifier: 16.2.10
         version: 16.2.10(@babel/core@7.29.7)(@playwright/test@1.61.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
-      pg:
-        specifier: 8.16.3
-        version: 8.16.3
       react:
         specifier: 19.2.7
         version: 19.2.7
@@ -80,6 +74,9 @@ importers:
       react-hook-form:
         specifier: 7.81.0
         version: 7.81.0(react@19.2.7)
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
       sharp:
         specifier: 0.35.3
         version: 0.35.3(@types/node@26.1.1)
@@ -2902,6 +2899,9 @@ packages:
 
   seq-queue@0.0.5:
     resolution: {integrity: sha512-hr3Wtp/GZIc/6DAGPDcV4/9WoZhjrkXsi5B/07QgX8tsdc6ilr7BFM6PM6rbdAX1kFSDYeZGLipIZZKyQP0O5Q==}
+
+  server-only@0.0.1:
+    resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
 
   set-function-length@1.2.2:
     resolution: {integrity: sha512-pgRc4hJ4/sNjWCSS9AmnS40x3bNMDTknHgL5UaMBTMyJnU90EgWh1Rz+MC9eFu4BuN/UwZjKQuY/1v3rM7HMfg==}
@@ -5918,6 +5918,8 @@ snapshots:
   semver@7.8.5: {}
 
   seq-queue@0.0.5: {}
+
+  server-only@0.0.1: {}
 
   set-function-length@1.2.2:
     dependencies:

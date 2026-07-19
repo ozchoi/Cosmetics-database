@@ -1,22 +1,11 @@
-import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
+import "server-only";
+
+import { getPrismaClient } from "@cosmetic-lens/database";
 import type {
   ProductIngredientRecord,
   ProductRecord,
   ProductVersionRecord,
 } from "@cosmetic-lens/shared";
-
-const defaultDatabaseUrl =
-  "postgresql://cosmetics:cosmetics@localhost:5432/cosmetics_lens?schema=public";
-
-let prisma: PrismaClient | undefined;
-
-const getPrisma = () => {
-  prisma ??= new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env["DATABASE_URL"] ?? defaultDatabaseUrl }),
-  });
-  return prisma;
-};
 
 interface ProductRow {
   product_id: string;
@@ -63,7 +52,11 @@ interface IngredientRow {
 }
 
 export const listDatabaseProducts = async (): Promise<ProductRecord[]> => {
-  const db = getPrisma();
+  if (!process.env["DATABASE_URL"]) {
+    throw new Error("DATABASE_URL is required for database product reads.");
+  }
+
+  const db = getPrismaClient();
   const rows = await db.$queryRaw<ProductRow[]>`
     select
       p.id::text as product_id,

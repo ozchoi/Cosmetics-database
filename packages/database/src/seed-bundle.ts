@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
+import { getPrismaClient, type PrismaClient } from "./client";
 
 export const seedBundleImporterVersion = "cosmetics-evidence-seed-v0.1-importer-v1";
 
@@ -434,7 +433,7 @@ export const importSeedBundleToDatabase = async (
   const { data, issues } = loadSeedBundle(bundlePath);
   if (!data) return report;
 
-  const prisma = createPrismaClient();
+  const prisma = getPrismaClient();
   try {
     const beforeCounts = await getDatabaseCounts(prisma);
     await prisma.$transaction(
@@ -468,7 +467,7 @@ export const importSeedBundleToDatabase = async (
 
 export const getDatabaseCounts = async (client?: PrismaClient): Promise<DatabaseCounts> => {
   const ownsClient = !client;
-  const prisma = client ?? createPrismaClient();
+  const prisma = client ?? getPrismaClient();
   try {
     const [rows] = await prisma.$queryRawUnsafe<
       Array<{
@@ -1498,12 +1497,6 @@ const mapRuleForSnapshot = (rule: RegulatoryRuleSeed) => ({
 });
 
 export const defaultBundlePath = "/Users/chunyinchoi/Downloads/cosmetics_evidence_seed_v0.1";
-const defaultDatabaseUrl =
-  "postgresql://cosmetics:cosmetics@localhost:5432/cosmetics_lens?schema=public";
-const createPrismaClient = () =>
-  new PrismaClient({
-    adapter: new PrismaPg({ connectionString: process.env["DATABASE_URL"] ?? defaultDatabaseUrl }),
-  });
 export const defaultReportPath = relative(
   process.cwd(),
   join(process.cwd(), "data", "import-reports", "cosmetics_evidence_seed_v0.1.report.json"),

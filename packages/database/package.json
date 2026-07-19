@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
-    "build": "prisma validate --schema prisma/schema.prisma",
+    "build": "prisma generate --schema prisma/schema.prisma && prisma validate --schema prisma/schema.prisma",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",

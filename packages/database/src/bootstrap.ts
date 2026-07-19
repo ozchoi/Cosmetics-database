@@ -1,7 +1,7 @@
-import { PrismaClient } from "@prisma/client";
 import { dataSourcePolicyRecords } from "@cosmetic-lens/shared";
+import { getPrismaClient } from "./client";
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 async function bootstrapDataSourcePolicies(): Promise<void> {
   for (const policy of dataSourcePolicyRecords) {
